@@ -20,6 +20,9 @@
 			<p class="date">Date: <span><b>{response[0].release_date}</b></span></p>
 			<p class="date">Rating: <span><b>{response[0].vote_average}/10</b></span></p>
 		</div>
+		<div class="play-overlay" aria-hidden="true">
+			<span class="play-button"><span></span></span>
+		</div>
 	</div>
 </div>
 
@@ -51,6 +54,7 @@
 		align-items: center;
 		flex-direction: row;
 		overflow: hidden;
+		cursor: pointer;
 	}
 	.hero img {
 		position: absolute;
@@ -60,6 +64,43 @@
 		display: block;
 		object-fit: cover;
 		object-position: center 35%;
+	}
+	.play-overlay {
+		position: absolute;
+		z-index: 10;
+		inset: 0;
+		display: grid;
+		place-items: center;
+		background: rgba(0, 0, 0, 0.16);
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 220ms ease;
+	}
+	.play-button {
+		display: grid;
+		width: 76px;
+		height: 76px;
+		place-items: center;
+		border: 1px solid rgba(255, 255, 255, 0.75);
+		border-radius: 50%;
+		background: rgba(8, 8, 8, 0.55);
+		box-shadow: 0 14px 40px rgba(0, 0, 0, 0.32);
+		transform: scale(0.82);
+		transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+	}
+	.play-button > span {
+		width: 0;
+		height: 0;
+		margin-left: 5px;
+		border-top: 10px solid transparent;
+		border-bottom: 10px solid transparent;
+		border-left: 16px solid white;
+	}
+	.hero:hover .play-overlay {
+		opacity: 1;
+	}
+	.hero:hover .play-button {
+		transform: scale(1);
 	}
 	.desc {
 		position: absolute;
