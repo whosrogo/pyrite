@@ -1,0 +1,23 @@
+body, html {
+	background-color: black;
+	margin: 0px;
+  width: 100%;
+}
+
+@font-face {
+	font-family: 'momcake';
+	src: url('../assets/fonts/momcake/MomcakeBold-WyonA.otf') format('truetype');
+	font-weight: 900;
+}
+
+@font-face {
+	font-family: 'momcake';
+	src: url('../assets/fonts/momcake/MomcakeThin-9Y6aZ.otf') format('truetype');
+	font-weight: 400;
+}
+@font-face {
+	font-family: 'raela';
+	src: url('../assets/fonts/raela/RaelademoThin-q2A11.otf') format('truetype');
+	font-weight: 400;
+}
+
