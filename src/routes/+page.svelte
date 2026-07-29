@@ -129,6 +129,19 @@
 		/** @type {HTMLInputElement} */ (event.currentTarget).blur();
 	}
 
+	/** @param {number} id */
+	function openWatch(id) {
+		const selection = {
+			id,
+			type: data.mediaType
+		};
+
+		localStorage.setItem('selectedMediaId', String(id));
+		localStorage.setItem('selectedMediaType', data.mediaType);
+		localStorage.setItem('selectedMedia', JSON.stringify(selection));
+		goto('/watch');
+	}
+
 	/** @param {'movies' | 'shows'} mediaType */
 	function changeMedia(mediaType) {
 		if (data.mediaType === mediaType) return;
@@ -256,7 +269,11 @@
 			{:else if searchResults.length}
 				<div class="search-result-list">
 					{#each searchResults as result (result.id)}
-						<article class="search-result">
+						<button
+							type="button"
+							class="search-result"
+							onclick={() => openWatch(result.id)}
+						>
 							{#if result.posterPath}
 								<img
 									src={`https://image.tmdb.org/t/p/w185${result.posterPath}`}
@@ -275,7 +292,7 @@
 									{result.voteAverage.toFixed(1)}
 								</p>
 							</div>
-						</article>
+						</button>
 					{/each}
 				</div>
 			{:else}
@@ -293,6 +310,13 @@
 				src={`https://image.tmdb.org/t/p/original${hero.backdrop_path}`}
 				alt={`Backdrop for ${hero.title}`}
 			/>
+
+			<button
+				type="button"
+				class="hero-action"
+				onclick={() => openWatch(hero.id)}
+				aria-label={`Watch ${hero.title}`}
+			></button>
 
 			<div class="hero-copy">
 				<p>Featured</p>
@@ -324,7 +348,11 @@
 					>
 						<div class="all-movies-grid">
 							{#each section.movies as movie (movie.id)}
-								<article class="movie-card">
+								<button
+									type="button"
+									class="movie-card"
+									onclick={() => openWatch(movie.id)}
+								>
 									<div class="poster">
 										<img
 											src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
@@ -337,7 +365,7 @@
 										</div>
 									</div>
 									<h3>{movie.title}</h3>
-								</article>
+								</button>
 							{/each}
 						</div>
 					</div>
@@ -349,7 +377,11 @@
 						aria-label={`${section.title} ${isShows ? 'shows' : 'movies'}`}
 					>
 						{#each section.movies as movie (movie.id)}
-							<article class="movie-card">
+							<button
+								type="button"
+								class="movie-card"
+								onclick={() => openWatch(movie.id)}
+							>
 								<div class="poster">
 									<img
 										src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
@@ -362,7 +394,7 @@
 									</div>
 								</div>
 								<h3>{movie.title}</h3>
-							</article>
+							</button>
 						{/each}
 					</div>
 				{/if}
@@ -541,12 +573,19 @@
 
 	.search-result {
 		display: grid;
+		width: 100%;
 		grid-template-columns: 2.8rem minmax(0, 1fr);
 		align-items: center;
 		gap: 0.8rem;
 		min-height: 4.35rem;
 		padding: 0.4rem;
+		border: 0;
 		border-radius: 0.7rem;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
 	}
 
 	.search-result:hover {
@@ -610,6 +649,26 @@
 		min-height: 36rem;
 		overflow: hidden;
 		cursor: pointer;
+	}
+
+	.hero-action:focus-visible,
+	.search-result:focus-visible,
+	.movie-card:focus-visible {
+		outline: 2px solid #efb33d;
+		outline-offset: 3px;
+	}
+
+	.hero-action {
+		position: absolute;
+		z-index: 4;
+		inset: 0;
+		border: 0;
+		background: transparent;
+		cursor: pointer;
+	}
+
+	.hero-action:focus-visible {
+		outline-offset: -4px;
 	}
 
 	.hero::after {
@@ -832,6 +891,13 @@
 
 	.movie-card {
 		min-width: 0;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
 		scroll-snap-align: start;
 	}
 
