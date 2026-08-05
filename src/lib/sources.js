@@ -73,14 +73,14 @@ export const showSources = [
 	{
 		id: 'vidfast',
 		label: 'Vidfast',
-		priority: 2,
+		priority: 3,
 		url: ({ id, season, episode }) =>
 			`https://vidfast.vc/tv/${id}/${season}/${episode}?autoPlay=true`
 	},
 	{
 		id: 'nebulaflix',
 		label: 'Nebulaflix',
-		priority: 1,
+		priority: 2,
 		url: ({
 			id,
 			season,
@@ -89,16 +89,30 @@ export const showSources = [
 `
 	},
 	{
+		id: '111movies',
+		label: '111movies',
+		priority: 5,
+		url: ({ id, season, episode }) => `https://111movies.net/tv/${id}/${season}/${episode}`
+	},
+	{
+		id: '2embed',
+		label: '2Embed',
+		priority: 6,
+		url: ({ id, season, episode }) =>
+			`https://www.2embed.cc/embedtv/${id}&s=${season}&e=${episode}
+`
+	},
+	{
 		id: 'vidzee',
 		label: 'Vidzee',
-		priority: 3,
+		priority: 4,
 		url: ({ id, season, episode }) =>
 			`https://player.vidzee.wtf/embed/tv/${id}/${season}/${episode}`
 	},
 	{
 		id: 'videasy',
 		label: 'Videasy',
-		priority: 4,
+		priority: 1,
 		url: ({ id, season, episode }) => `https://player.videasy.net/tv/${id}/${season}/${episode}`
 	}
 ];
