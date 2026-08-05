@@ -1,7 +1,9 @@
 <script>
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 	import logo from '$lib/assets/pyrite.png';
+
+	const MEDIA_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 	/** @type {import('./$types').PageProps} */
 	let { data } = $props();
@@ -151,7 +153,7 @@
 		localStorage.setItem('selectedMediaId', String(id));
 		localStorage.setItem('selectedMediaType', data.mediaType);
 		localStorage.setItem('selectedMedia', JSON.stringify(selection));
-		goto('/watch');
+		goto('watch');
 	}
 
 	/** @param {'movies' | 'shows'} mediaType */
@@ -159,10 +161,8 @@
 		if (data.mediaType === mediaType) return;
 
 		resetSearch();
-		goto(mediaType === 'shows' ? '?type=shows' : '/', {
-			keepFocus: true,
-			noScroll: true
-		});
+		document.cookie = `mediaType=${mediaType}; path=/; max-age=${MEDIA_COOKIE_MAX_AGE}; samesite=lax`;
+		invalidateAll();
 	}
 
 	/** @param {HTMLElement} node */

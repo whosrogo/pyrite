@@ -9,8 +9,9 @@ import {
 } from '$lib/server/tmdb';
 
 /** @type {import('./$types').PageServerLoad} */
-export async function load({ fetch, url }) {
-	const mediaType = url.searchParams.get('type') === 'shows' ? 'shows' : 'movies';
+export async function load({ fetch, url, cookies }) {
+	const requested = url.searchParams.get('type') ?? cookies.get('mediaType');
+	const mediaType = requested === 'shows' ? 'shows' : 'movies';
 	const pageCount = 15;
 	const getPopular = mediaType === 'shows' ? getPopularShow : getPopularMovie;
 	const getTopRated = mediaType === 'shows' ? getTopRatedShow : getTopRatedMovie;
