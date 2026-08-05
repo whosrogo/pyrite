@@ -1,3 +1,4 @@
+import { isBlocked } from '$lib/server/blocklist';
 import {
 	getDiscoverMovie,
 	getDiscoverShow,
@@ -14,7 +15,6 @@ export async function load({ fetch, url }) {
 	const getPopular = mediaType === 'shows' ? getPopularShow : getPopularMovie;
 	const getTopRated = mediaType === 'shows' ? getTopRatedShow : getTopRatedMovie;
 	const getDiscover = mediaType === 'shows' ? getDiscoverShow : getDiscoverMovie;
-	// TMDB keyword IDs: erotica | hentai
 	const blockedKeywordIds = '325693|198385';
 
 	const [popularResponse, topRatedResponse, ...discoverPages] = await Promise.all([
@@ -25,11 +25,7 @@ export async function load({ fetch, url }) {
 		)
 	]);
 
-	/**
-	 * Gives movie and TV results the same display fields.
-	 * @param {Array<Record<string, any>>} results
-	 */
-  
+	/** @param {Array<Record<string, any>>} results */
 	const normalize = (results) =>
 		results
 			.filter((item) => item.poster_path && item.adult !== true)
@@ -41,7 +37,8 @@ export async function load({ fetch, url }) {
 				poster_path: item.poster_path,
 				backdrop_path: item.backdrop_path,
 				vote_average: item.vote_average
-			}));
+			}))
+			.filter((item) => !isBlocked(item, mediaType));
 
 	const popular = normalize(popularResponse.results ?? []);
 	const topRated = normalize(topRatedResponse.results ?? []);

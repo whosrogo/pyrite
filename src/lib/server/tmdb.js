@@ -96,6 +96,38 @@ export function getDiscoverShow(requestFetch, page = 1, keywordIds = '') {
 
 /**
  * @param {typeof fetch} requestFetch
+ * @param {string} id
+ * @param {'movies' | 'shows'} mediaType
+ */
+export function getMediaDetails(requestFetch, id, mediaType) {
+	const endpoint = mediaType === 'shows' ? 'tv' : 'movie';
+
+	return request(requestFetch, `/${endpoint}/${encodeURIComponent(id)}?language=en-US`);
+}
+
+const ANIMATION_GENRE_ID = 16;
+
+/**
+ * @param {Record<string, any>} details
+ * @param {'movies' | 'shows'} mediaType
+ * @returns {'movies' | 'shows' | 'anime'}
+ */
+export function categorizeMedia(details, mediaType) {
+	const isAnimated = (details.genres ?? []).some(
+		/** @param {{ id: number }} genre */ (genre) => genre.id === ANIMATION_GENRE_ID
+	);
+	const isJapanese =
+		details.original_language === 'ja' ||
+		(details.origin_country ?? []).includes('JP') ||
+		(details.production_countries ?? []).some(
+			/** @param {{ iso_3166_1: string }} country */ (country) => country.iso_3166_1 === 'JP'
+		);
+
+	return isAnimated && isJapanese ? 'anime' : mediaType;
+}
+
+/**
+ * @param {typeof fetch} requestFetch
  * @param {string} query
  * @param {'movies' | 'shows'} mediaType
  */
