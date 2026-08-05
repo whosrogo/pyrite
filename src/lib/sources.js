@@ -124,6 +124,20 @@ export const animeSources = [
 `
 	},
 	{
+		id: '111movies',
+		label: '111movies',
+		priority: 5,
+		url: ({ id, season, episode }) => `https://111movies.net/tv/${id}/${season}/${episode}`
+	},
+	{
+		id: '2embed',
+		label: '2Embed',
+		priority: 6,
+		url: ({ id, season, episode }) =>
+			`https://www.2embed.cc/embedtv/${id}&s=${season}&e=${episode}
+`
+	},
+	{
 		id: 'vidzee',
 		label: 'Vidzee',
 		priority: 4,

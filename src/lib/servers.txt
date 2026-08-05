@@ -25,6 +25,16 @@ https://nebulaflix.stream/player?st={tmdb}&season={season}&episode={episode}
 https://player.vidzee.wtf/embed/tv/${id}/${season}/${episode}
 https://player.videasy.net/tv/${id}/${season}/${episode}
 
+https://111movies.net/tv/${id}/${season}/${episode}
+https://www.2embed.cc/embedtv/${id}&s=${season}&e=${episode}
+
+
+
+https://vidsrc.su/tv/[tmdbId]/[seasonId]/[episodeId]?parameters
+
+
+
+
 
 https://player.videasy.net/anime/{anilist_id}/{episode}
 
@@ -38,12 +48,9 @@ https://multiembed.mov/?video_id=${selectedId}&tmdb=1&s={season}&e={episode}
 https://vidlink.pro/tv/{tmdbId}/{season}/{episode}
 https://vidlink.pro/anime/{MALid}/{number}/{subOrDub}
 
-https://vidsrc.su/tv/[tmdbId]/[seasonId]/[episodeId]?parameters
 
 
-https://www.2embed.cc/embedtv/{imdb/tmdb}&s={season}&e={episode}
 
-https://111movies.net/tv/{id}/{season}/{episode}
 
 
 
