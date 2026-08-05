@@ -1,6 +1,6 @@
 /**
  * @typedef {'movies' | 'shows' | 'anime'} SourceCategory
- * @typedef {{ id: string, type: 'movies' | 'shows' }} Media
+ * @typedef {{ id: string, type: 'movies' | 'shows', season?: number, episode?: number }} Media
  * @typedef {{
  *   id: string,
  *   label: string,
@@ -71,56 +71,70 @@ export const movieSources = [
 /** @type {Source[]} */
 export const showSources = [
 	{
-		id: 'tubi',
-		label: 'Tubi',
-		priority: 1,
-		url: ({ id }) => `https://example.com/tubi/shows/${id}`
-	},
-	{
-		id: 'pluto',
-		label: 'Pluto TV',
+		id: 'vidfast',
+		label: 'Vidfast',
 		priority: 2,
-		url: ({ id }) => `https://example.com/pluto/shows/${id}`
+		url: ({ id, season, episode }) =>
+			`https://vidfast.vc/tv/${id}/${season}/${episode}?autoPlay=true`
 	},
 	{
-		id: 'roku',
-		label: 'Roku Channel',
+		id: 'nebulaflix',
+		label: 'Nebulaflix',
+		priority: 1,
+		url: ({
+			id,
+			season,
+			episode
+		}) => `https://nebulaflix.stream/player?st=${id}&season=${season}&episode=${episode}
+`
+	},
+	{
+		id: 'vidzee',
+		label: 'Vidzee',
 		priority: 3,
-		url: ({ id }) => `https://example.com/roku/shows/${id}`
+		url: ({ id, season, episode }) =>
+			`https://player.vidzee.wtf/embed/tv/${id}/${season}/${episode}`
 	},
 	{
-		id: 'hoopla',
-		label: 'Hoopla',
+		id: 'videasy',
+		label: 'Videasy',
 		priority: 4,
-		url: ({ id }) => `https://example.com/hoopla/shows/${id}`
+		url: ({ id, season, episode }) => `https://player.videasy.net/tv/${id}/${season}/${episode}`
 	}
 ];
 
 /** @type {Source[]} */
 export const animeSources = [
 	{
-		id: 'crunchyroll',
-		label: 'Crunchyroll',
-		priority: 1,
-		url: ({ id, type }) => `https://example.com/crunchyroll/anime/${type}/${id}`
-	},
-	{
-		id: 'retrocrush',
-		label: 'RetroCrush',
-		priority: 2,
-		url: ({ id, type }) => `https://example.com/retrocrush/anime/${type}/${id}`
-	},
-	{
-		id: 'tubi-anime',
-		label: 'Tubi Anime',
+		id: 'vidfast',
+		label: 'Vidfast',
 		priority: 3,
-		url: ({ id, type }) => `https://example.com/tubi/anime/${type}/${id}`
+		url: ({ id, season, episode }) =>
+			`https://vidfast.vc/tv/${id}/${season}/${episode}?autoPlay=true`
 	},
 	{
-		id: 'pluto-anime',
-		label: 'Pluto Anime',
+		id: 'nebulaflix',
+		label: 'Nebulaflix',
+		priority: 2,
+		url: ({
+			id,
+			season,
+			episode
+		}) => `https://nebulaflix.stream/player?st=${id}&season=${season}&episode=${episode}
+`
+	},
+	{
+		id: 'vidzee',
+		label: 'Vidzee',
 		priority: 4,
-		url: ({ id, type }) => `https://example.com/pluto/anime/${type}/${id}`
+		url: ({ id, season, episode }) =>
+			`https://player.vidzee.wtf/embed/tv/${id}/${season}/${episode}`
+	},
+	{
+		id: 'videasy',
+		label: 'Videasy',
+		priority: 1,
+		url: ({ id, season, episode }) => `https://player.videasy.net/tv/${id}/${season}/${episode}`
 	}
 ];
 
@@ -139,7 +153,7 @@ export const categoryLabels = {
 };
 
 /** @param {Media & { category?: SourceCategory, proxy?: string }} media */
-export function buildCandidates({ id, type, category, proxy }) {
+export function buildCandidates({ id, type, category, season, episode, proxy }) {
 	const list = sourcesByCategory[category ?? type] ?? sourcesByCategory[type];
 
 	return [...list]
@@ -148,6 +162,6 @@ export function buildCandidates({ id, type, category, proxy }) {
 			id: source.id,
 			label: source.label,
 			priority: source.priority,
-			url: formatURL(source.url({ id, type }), proxy)
+			url: formatURL(source.url({ id, type, season, episode }), proxy)
 		}));
 }

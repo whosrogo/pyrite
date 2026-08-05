@@ -22,6 +22,13 @@
 	/** @type {'checking' | 'ready' | 'empty' | 'error' | 'missing'} */
 	let status = $state('checking');
 
+	/** @type {Array<{ number: number, name: string, episodeCount: number }>} */
+	let seasons = $state([]);
+	/** @type {Array<{ number: number, name: string, airDate: string }>} */
+	let episodes = $state([]);
+	let season = $state(1);
+	let episode = $state(1);
+
 	let available = $derived(probed.filter((source) => source.ok && !failedIds.includes(source.id)));
 	let active = $derived(available.find((source) => source.id === activeId) ?? null);
 
@@ -35,12 +42,56 @@
 
 		if (!selectedId) {
 			status = 'missing';
+		} else if (selectedType === 'shows') {
+			startShow();
 		} else {
 			checkSources();
 		}
 
 		return () => window.clearTimeout(embedTimer);
 	});
+
+	async function startShow() {
+		await loadEpisodes();
+		episode = episodes[0]?.number ?? 1;
+		checkSources();
+	}
+
+	/** @param {number} [requested] */
+	async function loadEpisodes(requested) {
+		const params = new URLSearchParams({ id: selectedId });
+		if (requested) params.set('season', String(requested));
+
+		try {
+			const response = await fetch(`${resolve('/api/episodes')}?${params}`);
+
+			if (!response.ok) throw new Error('Episode lookup failed');
+
+			const payload = await response.json();
+			seasons = payload.seasons ?? [];
+			episodes = payload.episodes ?? [];
+			season = payload.season ?? 1;
+		} catch {
+			seasons = [];
+			episodes = [];
+		}
+	}
+
+	/** @param {Event} event */
+	async function handleSeasonChange(event) {
+		const next = Number(/** @type {HTMLSelectElement} */ (event.currentTarget).value);
+		if (next === season) return;
+
+		await loadEpisodes(next);
+		episode = episodes[0]?.number ?? 1;
+		checkSources();
+	}
+
+	/** @param {Event} event */
+	function handleEpisodeChange(event) {
+		episode = Number(/** @type {HTMLSelectElement} */ (event.currentTarget).value);
+		checkSources();
+	}
 
 	async function checkSources() {
 		status = 'checking';
@@ -49,6 +100,10 @@
 
 		try {
 			const params = new URLSearchParams({ id: selectedId, type: selectedType });
+			if (selectedType === 'shows') {
+				params.set('season', String(season));
+				params.set('episode', String(episode));
+			}
 			if (proxyEndpoint) params.set('proxy', proxyEndpoint);
 
 			const response = await fetch(`${resolve('/api/sources')}?${params}`);
@@ -145,6 +200,28 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if seasons.length}
+		<nav class="episodes" aria-label="Season and episode">
+			<label>
+				<span>Season</span>
+				<select value={season} onchange={handleSeasonChange}>
+					{#each seasons as item (item.number)}
+						<option value={item.number}>{item.name}</option>
+					{/each}
+				</select>
+			</label>
+
+			<label>
+				<span>Episode</span>
+				<select value={episode} onchange={handleEpisodeChange}>
+					{#each episodes as item (item.number)}
+						<option value={item.number}>{item.number}. {item.name}</option>
+					{/each}
+				</select>
+			</label>
+		</nav>
+	{/if}
 
 	{#if probed.length}
 		<nav class="sources" aria-label={categoryLabels[category]}>
@@ -247,6 +324,46 @@
 		font-size: 0.75rem;
 		font-weight: 750;
 		cursor: pointer;
+	}
+
+	.episodes {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.6rem;
+		padding: 1rem 1rem 0;
+		background: #090909;
+	}
+
+	.episodes label {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		min-width: 0;
+		color: rgba(255, 255, 255, 0.4);
+		font-size: 0.62rem;
+		font-weight: 800;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+	}
+
+	.episodes select {
+		max-width: 16rem;
+		padding: 0.55rem 0.9rem;
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 999px;
+		background: #181818;
+		color: rgba(255, 255, 255, 0.86);
+		font: inherit;
+		font-size: 0.74rem;
+		font-weight: 600;
+		text-overflow: ellipsis;
+		cursor: pointer;
+	}
+
+	.episodes select:focus-visible {
+		outline: 2px solid #efb33d;
+		outline-offset: 2px;
 	}
 
 	.sources {

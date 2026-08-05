@@ -103,8 +103,10 @@ export async function GET({ fetch, url }) {
 		});
 	}
 
+	const season = Number(url.searchParams.get('season')) || 1;
+	const episode = Number(url.searchParams.get('episode')) || 1;
 	const category = await resolveCategory(fetch, url.searchParams.get('category'), id, mediaType);
-	const candidates = buildCandidates({ id, type: mediaType, category, proxy });
+	const candidates = buildCandidates({ id, type: mediaType, category, season, episode, proxy });
 	const results = await Promise.all(
 		candidates.map(async (candidate) => ({
 			...candidate,

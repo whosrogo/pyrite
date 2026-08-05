@@ -105,6 +105,15 @@ export function getMediaDetails(requestFetch, id, mediaType) {
 	return request(requestFetch, `/${endpoint}/${encodeURIComponent(id)}?language=en-US`);
 }
 
+/**
+ * @param {typeof fetch} requestFetch
+ * @param {string} id
+ * @param {number} season
+ */
+export function getSeason(requestFetch, id, season) {
+	return request(requestFetch, `/tv/${encodeURIComponent(id)}/season/${season}?language=en-US`);
+}
+
 const ANIMATION_GENRE_ID = 16;
 
 /**

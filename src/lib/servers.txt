@@ -15,9 +15,23 @@ https://vidsrc.su/movie/${selectedId}
 https://vidlink.pro/movie/${selectedId}
 https://multiembed.mov/?video_id=${selectedId}&tmdb=1 NSFW
 https://www.2embed.cc/embed/${selectedId} NSFW
-
-
 https://mapple.uk/watch/tv/${selectedId}-{season}-{episode}
+
+
+-------------------------
+
+https://vidfast.vc/tv/{id}/{season}/{episode}?autoPlay=true
+https://nebulaflix.stream/player?st={tmdb}&season={season}&episode={episode}
+https://player.vidzee.wtf/embed/tv/${id}/${season}/${episode}
+https://player.videasy.net/tv/${id}/${season}/${episode}
+
+
+https://player.videasy.net/anime/{anilist_id}/{episode}
+
+
+
+
+
 
 https://multiembed.mov/?video_id=${selectedId}&tmdb=1&s={season}&e={episode}
 
@@ -32,13 +46,8 @@ https://www.2embed.cc/embedtv/{imdb/tmdb}&s={season}&e={episode}
 https://111movies.net/tv/{id}/{season}/{episode}
 
 
-https://player.videasy.net/tv/{TMDB}/{season}/{episode}
-https://player.videasy.net/anime/{anilist_id}/{episode}
 
-https://vidfast.vc/tv/{id}/{season}/{episode}?autoPlay=true
 
-https://player.vidzee.wtf/embed/tv/{tmdb_id}/{season}/{episode}
+
+
 https://player.vidzee.wtf/v2/embed/tv/{tmdb_id}/{season}/{episode}
-
-
-https://nebulaflix.stream/player?st={tmdb}&season={season}&episode={episode}
