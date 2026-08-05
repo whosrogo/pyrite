@@ -1,5 +1,5 @@
 import { categorizeMedia, getMediaDetails } from '$lib/server/tmdb';
-import { buildCandidates } from '$lib/sources';
+import { DEFAULT_PROXY_ENDPOINT, buildCandidates } from '$lib/sources';
 import { json } from '@sveltejs/kit';
 
 const PROBE_TIMEOUT = 4000;
@@ -55,17 +55,56 @@ async function resolveCategory(requestFetch, requested, id, mediaType) {
 	}
 }
 
+/** @param {string} hostname */
+function isPrivateHost(hostname) {
+	const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+
+	return (
+		host === 'localhost' ||
+		host === '::1' ||
+		host.endsWith('.local') ||
+		/^(0|10|127)\./.test(host) ||
+		/^169\.254\./.test(host) ||
+		/^192\.168\./.test(host) ||
+		/^172\.(1[6-9]|2\d|3[01])\./.test(host)
+	);
+}
+
+/** @param {string | null} requested */
+function resolveProxy(requested) {
+	if (!requested) return undefined;
+	if (requested === '1' || requested === 'true') return DEFAULT_PROXY_ENDPOINT;
+
+	try {
+		const parsed = new URL(requested);
+
+		if (parsed.protocol !== 'https:' || isPrivateHost(parsed.hostname)) return undefined;
+
+		return requested;
+	} catch {
+		return undefined;
+	}
+}
+
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ fetch, url }) {
 	const id = url.searchParams.get('id')?.trim() ?? '';
 	const mediaType = url.searchParams.get('type') === 'shows' ? 'shows' : 'movies';
 
+	const proxy = resolveProxy(url.searchParams.get('proxy'));
+
 	if (!id) {
-		return json({ category: mediaType, sources: [], available: [], best: null });
+		return json({
+			category: mediaType,
+			proxy: proxy ?? null,
+			sources: [],
+			available: [],
+			best: null
+		});
 	}
 
 	const category = await resolveCategory(fetch, url.searchParams.get('category'), id, mediaType);
-	const candidates = buildCandidates({ id, type: mediaType, category });
+	const candidates = buildCandidates({ id, type: mediaType, category, proxy });
 	const results = await Promise.all(
 		candidates.map(async (candidate) => ({
 			...candidate,
@@ -79,6 +118,7 @@ export async function GET({ fetch, url }) {
 
 	return json({
 		category,
+		proxy: proxy ?? null,
 		sources: results,
 		available,
 		best: available[0] ?? null

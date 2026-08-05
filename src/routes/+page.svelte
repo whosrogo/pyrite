@@ -1,9 +1,21 @@
 <script>
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import logo from '$lib/assets/pyrite.png';
 
 	/** @type {import('./$types').PageProps} */
 	let { data } = $props();
+
+	$effect(() => {
+		const api = page.url.searchParams.get('api');
+		if (api === null) return;
+
+		if (api.trim()) {
+			localStorage.setItem('proxyEndpoint', api.trim());
+		} else {
+			localStorage.removeItem('proxyEndpoint');
+		}
+	});
 
 	let hero = $derived(data.popular?.[0]);
 	let isShows = $derived(data.mediaType === 'shows');

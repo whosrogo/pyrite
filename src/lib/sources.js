@@ -9,6 +9,24 @@
  * }} Source
  */
 
+export const DEFAULT_PROXY_ENDPOINT = 'https://v7.galxy.it.com/api';
+
+/**
+ * @param {string} target
+ * @param {string} [endpoint]
+ */
+export function formatURL(target, endpoint) {
+	if (!endpoint) return target;
+
+	const encoded = encodeURIComponent(target);
+
+	if (endpoint.includes('{url}')) {
+		return endpoint.replace(/\$?\{url\}/g, encoded);
+	}
+
+	return `${endpoint}${endpoint.includes('?') ? '&' : '?'}url=${encoded}`;
+}
+
 /** @type {Source[]} */
 export const movieSources = [
 	{
@@ -120,8 +138,8 @@ export const categoryLabels = {
 	anime: 'Anime sources'
 };
 
-/** @param {Media & { category?: SourceCategory }} media */
-export function buildCandidates({ id, type, category }) {
+/** @param {Media & { category?: SourceCategory, proxy?: string }} media */
+export function buildCandidates({ id, type, category, proxy }) {
 	const list = sourcesByCategory[category ?? type] ?? sourcesByCategory[type];
 
 	return [...list]
@@ -130,6 +148,6 @@ export function buildCandidates({ id, type, category }) {
 			id: source.id,
 			label: source.label,
 			priority: source.priority,
-			url: source.url({ id, type })
+			url: formatURL(source.url({ id, type }), proxy)
 		}));
 }

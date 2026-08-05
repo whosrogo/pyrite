@@ -8,6 +8,7 @@
 	let selectedId = $state('');
 	/** @type {'movies' | 'shows'} */
 	let selectedType = $state('movies');
+	let proxyEndpoint = '';
 
 	/** @type {Array<{ id: string, label: string, url: string, ok: boolean, status: number, latency: number }>} */
 	let probed = $state([]);
@@ -29,6 +30,7 @@
 	onMount(() => {
 		selectedId = localStorage.getItem('selectedMediaId') ?? '';
 		selectedType = localStorage.getItem('selectedMediaType') === 'shows' ? 'shows' : 'movies';
+		proxyEndpoint = localStorage.getItem('proxyEndpoint') ?? '';
 
 		if (!selectedId) {
 			status = 'missing';
@@ -45,9 +47,10 @@
 		activeId = '';
 
 		try {
-			const response = await fetch(
-				`/api/sources?id=${encodeURIComponent(selectedId)}&type=${selectedType}`
-			);
+			const params = new URLSearchParams({ id: selectedId, type: selectedType });
+			if (proxyEndpoint) params.set('proxy', proxyEndpoint);
+
+			const response = await fetch(`/api/sources?${params}`);
 
 			if (!response.ok) throw new Error('Source check failed');
 
