@@ -1,5 +1,6 @@
 <script>
 	import { goto, invalidateAll } from '$app/navigation';
+	import { base, resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import logo from '$lib/assets/pyrite.png';
 
@@ -84,7 +85,7 @@
 
 		try {
 			const response = await fetch(
-				`/api/search?q=${encodeURIComponent(query)}&type=${data.mediaType}`,
+				`${resolve('/api/search')}?q=${encodeURIComponent(query)}&type=${data.mediaType}`,
 				{ signal: controller.signal }
 			);
 
@@ -153,7 +154,7 @@
 		localStorage.setItem('selectedMediaId', String(id));
 		localStorage.setItem('selectedMediaType', data.mediaType);
 		localStorage.setItem('selectedMedia', JSON.stringify(selection));
-		goto('watch');
+		goto(resolve('/watch'));
 	}
 
 	/** @param {'movies' | 'shows'} mediaType */
@@ -161,7 +162,7 @@
 		if (data.mediaType === mediaType) return;
 
 		resetSearch();
-		document.cookie = `mediaType=${mediaType}; path=/; max-age=${MEDIA_COOKIE_MAX_AGE}; samesite=lax`;
+		document.cookie = `mediaType=${mediaType}; path=${base || '/'}; max-age=${MEDIA_COOKIE_MAX_AGE}; samesite=lax`;
 		invalidateAll();
 	}
 

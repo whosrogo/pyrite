@@ -1,5 +1,6 @@
 <script>
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { categoryLabels } from '$lib/sources';
 	import { onMount } from 'svelte';
 
@@ -50,7 +51,7 @@
 			const params = new URLSearchParams({ id: selectedId, type: selectedType });
 			if (proxyEndpoint) params.set('proxy', proxyEndpoint);
 
-			const response = await fetch(`/api/sources?${params}`);
+			const response = await fetch(`${resolve('/api/sources')}?${params}`);
 
 			if (!response.ok) throw new Error('Source check failed');
 
@@ -108,7 +109,7 @@
 </svelte:head>
 
 <main>
-	<button class="back" type="button" onclick={() => goto('/')}>← Back to browse</button>
+	<button class="back" type="button" onclick={() => goto(resolve('/'))}>← Back to browse</button>
 
 	<div class="player">
 		{#if active}
@@ -133,7 +134,7 @@
 					<p>Loading {active?.label}…</p>
 				{:else if status === 'missing'}
 					<p>No title selected.</p>
-					<button type="button" onclick={() => goto('/')}>Browse titles</button>
+					<button type="button" onclick={() => goto(resolve('/'))}>Browse titles</button>
 				{:else if status === 'error'}
 					<p>Could not reach the source check.</p>
 					<button type="button" onclick={checkSources}>Try again</button>
