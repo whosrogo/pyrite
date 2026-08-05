@@ -171,8 +171,6 @@
 			moved = false;
 			startX = event.clientX;
 			startScroll = node.scrollLeft;
-			node.setPointerCapture(event.pointerId);
-			node.classList.add('dragging');
 		}
 
 		/** @param {PointerEvent} event */
@@ -180,7 +178,14 @@
 			if (!dragging) return;
 
 			const distance = event.clientX - startX;
-			if (Math.abs(distance) > 4) moved = true;
+			if (!moved && Math.abs(distance) <= 4) return;
+
+			if (!moved) {
+				moved = true;
+				node.setPointerCapture(event.pointerId);
+				node.classList.add('dragging');
+			}
+
 			node.scrollLeft = startScroll - distance;
 		}
 
@@ -192,6 +197,19 @@
 			if (node.hasPointerCapture(event.pointerId)) {
 				node.releasePointerCapture(event.pointerId);
 			}
+			node.classList.remove('dragging');
+			window.setTimeout(() => {
+				moved = false;
+			});
+		}
+
+		function pointerLeave() {
+			if (dragging && !moved) dragging = false;
+		}
+
+		function pointerCancel() {
+			dragging = false;
+			moved = false;
 			node.classList.remove('dragging');
 		}
 
@@ -206,7 +224,8 @@
 		node.addEventListener('pointerdown', pointerDown);
 		node.addEventListener('pointermove', pointerMove);
 		node.addEventListener('pointerup', pointerUp);
-		node.addEventListener('pointercancel', pointerUp);
+		node.addEventListener('pointerleave', pointerLeave);
+		node.addEventListener('pointercancel', pointerCancel);
 		node.addEventListener('click', stopDraggedClick, true);
 
 		return {
@@ -214,7 +233,8 @@
 				node.removeEventListener('pointerdown', pointerDown);
 				node.removeEventListener('pointermove', pointerMove);
 				node.removeEventListener('pointerup', pointerUp);
-				node.removeEventListener('pointercancel', pointerUp);
+				node.removeEventListener('pointerleave', pointerLeave);
+				node.removeEventListener('pointercancel', pointerCancel);
 				node.removeEventListener('click', stopDraggedClick, true);
 			}
 		};
