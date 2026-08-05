@@ -22,6 +22,11 @@
 
 	let hero = $derived(data.popular?.[0]);
 	let isShows = $derived(data.mediaType === 'shows');
+
+	/** @type {'movies' | 'shows' | null} */
+	let pendingType = $state(null);
+	let switching = $derived(pendingType !== null);
+	let toggleType = $derived(pendingType ?? data.mediaType);
 	let sections = $derived([
 		{
 			id: 'popular',
@@ -158,12 +163,19 @@
 	}
 
 	/** @param {'movies' | 'shows'} mediaType */
-	function changeMedia(mediaType) {
-		if (data.mediaType === mediaType) return;
+	async function changeMedia(mediaType) {
+		if (switching || data.mediaType === mediaType) return;
 
 		resetSearch();
+		pendingType = mediaType;
 		document.cookie = `mediaType=${mediaType}; path=${base || '/'}; max-age=${MEDIA_COOKIE_MAX_AGE}; samesite=lax`;
-		invalidateAll();
+
+		try {
+			await invalidateAll();
+			window.scrollTo({ top: 0 });
+		} finally {
+			pendingType = null;
+		}
 	}
 
 	/** @param {HTMLElement} node */
@@ -326,7 +338,7 @@
 	{/if}
 </div>
 
-<div class="content">
+<div class="content" class:switching>
 	{#if hero}
 		<section class="hero" aria-labelledby="hero-title">
 			<img
@@ -419,17 +431,19 @@
 	</div>
 </div>
 
-<nav class="media-toggle" aria-label="Choose what to browse">
+<nav class="media-toggle" aria-label="Choose what to browse" aria-busy={switching}>
 	<button
 		type="button"
-		class:active={!isShows}
-		aria-pressed={!isShows}
+		class:active={toggleType === 'movies'}
+		aria-pressed={toggleType === 'movies'}
+		disabled={switching}
 		onclick={() => changeMedia('movies')}>Movies</button
 	>
 	<button
 		type="button"
-		class:active={isShows}
-		aria-pressed={isShows}
+		class:active={toggleType === 'shows'}
+		aria-pressed={toggleType === 'shows'}
+		disabled={switching}
 		onclick={() => changeMedia('shows')}>Shows</button
 	>
 </nav>
@@ -689,6 +703,12 @@
 		width: 100%;
 		overflow: hidden;
 		background: var(--bg);
+		transition: opacity 180ms ease;
+	}
+
+	.content.switching {
+		opacity: 0.4;
+		pointer-events: none;
 	}
 
 	.hero {
@@ -880,6 +900,10 @@
 	.media-toggle button:focus-visible {
 		outline: 2px solid var(--fg);
 		outline-offset: 2px;
+	}
+
+	.media-toggle button:disabled {
+		cursor: progress;
 	}
 
 	.movie-section {
@@ -1089,6 +1113,7 @@
 			scroll-behavior: auto;
 		}
 
+		.content,
 		.play-overlay,
 		.card-play,
 		.play-button,
