@@ -32,38 +32,38 @@ export const movieSources = [
 	{
 		id: 'vidfast',
 		label: 'Vidfast',
-		priority: 1,
+		priority: 6,
 		url: ({ id }) => `https://vidfast.vc/movie/${id}?autoPlay=true
 `
 	},
 	{
 		id: 'nebulaflix',
 		label: 'Nebulaflix',
-		priority: 2,
+		priority: 5,
 		url: ({ id }) => `https://nebulaflix.stream/player?mt=${id}`
 	},
 	{
 		id: 'mapple',
 		label: 'Mapple',
-		priority: 3,
+		priority: 4,
 		url: ({ id }) => `https://mapple.uk/watch/movie/${id}`
 	},
 	{
 		id: 'vidzee',
 		label: 'Vidzee',
-		priority: 4,
+		priority: 3,
 		url: ({ id }) => `https://player.vidzee.wtf/embed/movie/${id}`
 	},
 	{
 		id: 'videasy',
 		label: 'Videasy',
-		priority: 4,
+		priority: 2,
 		url: ({ id }) => `https://player.videasy.net/movie/${id}`
 	},
 	{
 		id: '111movies',
 		label: '111Movies',
-		priority: 4,
+		priority: 1,
 		url: ({ id }) => `https://111movies.net/movie/${id}`
 	}
 ];
@@ -73,14 +73,14 @@ export const showSources = [
 	{
 		id: 'vidfast',
 		label: 'Vidfast',
-		priority: 3,
+		priority: 7,
 		url: ({ id, season, episode }) =>
 			`https://vidfast.vc/tv/${id}/${season}/${episode}?autoPlay=true`
 	},
 	{
 		id: 'nebulaflix',
 		label: 'Nebulaflix',
-		priority: 2,
+		priority: 1,
 		url: ({
 			id,
 			season,
@@ -91,28 +91,20 @@ export const showSources = [
 	{
 		id: '111movies',
 		label: '111movies',
-		priority: 5,
+		priority: 2,
 		url: ({ id, season, episode }) => `https://111movies.net/tv/${id}/${season}/${episode}`
-	},
-	{
-		id: '2embed',
-		label: '2Embed',
-		priority: 6,
-		url: ({ id, season, episode }) =>
-			`https://www.2embed.cc/embedtv/${id}&s=${season}&e=${episode}
-`
 	},
 	{
 		id: 'vidzee',
 		label: 'Vidzee',
-		priority: 4,
+		priority: 3,
 		url: ({ id, season, episode }) =>
 			`https://player.vidzee.wtf/embed/tv/${id}/${season}/${episode}`
 	},
 	{
 		id: 'videasy',
 		label: 'Videasy',
-		priority: 1,
+		priority: 6,
 		url: ({ id, season, episode }) => `https://player.videasy.net/tv/${id}/${season}/${episode}`
 	}
 ];
@@ -142,14 +134,6 @@ export const animeSources = [
 		label: '111movies',
 		priority: 5,
 		url: ({ id, season, episode }) => `https://111movies.net/tv/${id}/${season}/${episode}`
-	},
-	{
-		id: '2embed',
-		label: '2Embed',
-		priority: 6,
-		url: ({ id, season, episode }) =>
-			`https://www.2embed.cc/embedtv/${id}&s=${season}&e=${episode}
-`
 	},
 	{
 		id: 'vidzee',
