@@ -33,38 +33,38 @@ export const movieSources = [
 		id: 'vidfast',
 		label: 'Vidfast',
 		priority: 6,
-		url: ({ id }) => `https://vidfast.vc/movie/${id}?autoPlay=true
+		url: ({ id }) => `https://tinyurl.com/3tv998w5/movie/${id}?autoPlay=true
 `
 	},
 	{
 		id: 'nebulaflix',
 		label: 'Nebulaflix',
 		priority: 5,
-		url: ({ id }) => `https://nebulaflix.stream/player?mt=${id}`
+		url: ({ id }) => `https://tinyurl.com/44yxvzku/player?mt=${id}`
 	},
 	{
 		id: 'mapple',
 		label: 'Mapple',
 		priority: 4,
-		url: ({ id }) => `https://mapple.uk/watch/movie/${id}`
+		url: ({ id }) => `https://tinyurl.com/mtr5drt8/watch/movie/${id}`
 	},
 	{
 		id: 'vidzee',
 		label: 'Vidzee',
 		priority: 3,
-		url: ({ id }) => `https://player.vidzee.wtf/embed/movie/${id}`
+		url: ({ id }) => `https://tinyurl.com/4mm3msn9/embed/movie/${id}`
 	},
 	{
 		id: 'videasy',
 		label: 'Videasy',
 		priority: 2,
-		url: ({ id }) => `https://player.videasy.net/movie/${id}`
+		url: ({ id }) => `https://tinyurl.com/bdek4j5w/movie/${id}`
 	},
 	{
 		id: '111movies',
 		label: '111Movies',
 		priority: 1,
-		url: ({ id }) => `https://111movies.net/movie/${id}`
+		url: ({ id }) => `https://tinyurl.com/y8t5bx23/movie/${id}`
 	}
 ];
 
@@ -75,7 +75,7 @@ export const showSources = [
 		label: 'Vidfast',
 		priority: 7,
 		url: ({ id, season, episode }) =>
-			`https://vidfast.vc/tv/${id}/${season}/${episode}?autoPlay=true`
+			`https://tinyurl.com/3tv998w5/tv/${id}/${season}/${episode}?autoPlay=true`
 	},
 	{
 		id: 'nebulaflix',
@@ -85,27 +85,27 @@ export const showSources = [
 			id,
 			season,
 			episode
-		}) => `https://nebulaflix.stream/player?st=${id}&season=${season}&episode=${episode}
+		}) => `https://tinyurl.com/44yxvzku/player?st=${id}&season=${season}&episode=${episode}
 `
 	},
 	{
 		id: '111movies',
 		label: '111movies',
 		priority: 2,
-		url: ({ id, season, episode }) => `https://111movies.net/tv/${id}/${season}/${episode}`
+		url: ({ id, season, episode }) => `https://tinyurl.com/y8t5bx23/tv/${id}/${season}/${episode}`
 	},
 	{
 		id: 'vidzee',
 		label: 'Vidzee',
 		priority: 3,
 		url: ({ id, season, episode }) =>
-			`https://player.vidzee.wtf/embed/tv/${id}/${season}/${episode}`
+			`https://tinyurl.com/4mm3msn9/embed/tv/${id}/${season}/${episode}`
 	},
 	{
 		id: 'videasy',
 		label: 'Videasy',
 		priority: 6,
-		url: ({ id, season, episode }) => `https://player.videasy.net/tv/${id}/${season}/${episode}`
+		url: ({ id, season, episode }) => `https://tinyurl.com/bdek4j5w/tv/${id}/${season}/${episode}`
 	}
 ];
 
@@ -116,7 +116,7 @@ export const animeSources = [
 		label: 'Vidfast',
 		priority: 3,
 		url: ({ id, season, episode }) =>
-			`https://vidfast.vc/tv/${id}/${season}/${episode}?autoPlay=true`
+			`https://tinyurl.com/3tv998w5/tv/${id}/${season}/${episode}?autoPlay=true`
 	},
 	{
 		id: 'nebulaflix',
@@ -126,27 +126,27 @@ export const animeSources = [
 			id,
 			season,
 			episode
-		}) => `https://nebulaflix.stream/player?st=${id}&season=${season}&episode=${episode}
+		}) => `https://tinyurl.com/44yxvzku/player?st=${id}&season=${season}&episode=${episode}
 `
 	},
 	{
 		id: '111movies',
 		label: '111movies',
 		priority: 5,
-		url: ({ id, season, episode }) => `https://111movies.net/tv/${id}/${season}/${episode}`
+		url: ({ id, season, episode }) => `https://tinyurl.com/y8t5bx23/tv/${id}/${season}/${episode}`
 	},
 	{
 		id: 'vidzee',
 		label: 'Vidzee',
 		priority: 4,
 		url: ({ id, season, episode }) =>
-			`https://player.vidzee.wtf/embed/tv/${id}/${season}/${episode}`
+			`https://tinyurl.com/4mm3msn9/embed/tv/${id}/${season}/${episode}`
 	},
 	{
 		id: 'videasy',
 		label: 'Videasy',
 		priority: 1,
-		url: ({ id, season, episode }) => `https://player.videasy.net/tv/${id}/${season}/${episode}`
+		url: ({ id, season, episode }) => `https://tinyurl.com/bdek4j5w/tv/${id}/${season}/${episode}`
 	}
 ];
 
