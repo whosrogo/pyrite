@@ -1,24 +1,13 @@
 <script>
 	import { goto, invalidateAll } from '$app/navigation';
 	import { base, resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import logo from '$lib/assets/pyrite.png';
+	import { cubicIn, quintOut } from 'svelte/easing';
 
 	const MEDIA_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 	/** @type {import('./$types').PageProps} */
 	let { data } = $props();
-
-	$effect(() => {
-		const api = page.url.searchParams.get('api');
-		if (api === null) return;
-
-		if (api.trim()) {
-			localStorage.setItem('proxyEndpoint', api.trim());
-		} else {
-			localStorage.removeItem('proxyEndpoint');
-		}
-	});
 
 	let hero = $derived(data.popular?.[0]);
 	let isShows = $derived(data.mediaType === 'shows');
@@ -149,18 +138,95 @@
 		/** @type {HTMLInputElement} */ (event.currentTarget).blur();
 	}
 
-	/** @param {number} id */
-	function openWatch(id) {
+	const IMG = 'https://image.tmdb.org/t/p';
+
+	/**
+	 * Opens the watch page. The clicked image gets a view-transition-name so it morphs
+	 * into the poster (or backdrop) slot on the watch page; we pass its exact URL along
+	 * so the browser already has it cached when the morph runs.
+	 *
+	 * @param {{ id: number, title: string, release_date?: string, releaseDate?: string, poster_path?: string | null, posterPath?: string | null, backdrop_path?: string | null }} item
+	 * @param {HTMLImageElement | null | undefined} [image]
+	 * @param {'poster' | 'backdrop'} [morph]
+	 */
+	function openWatch(item, image, morph = 'poster') {
+		const posterPath = item.poster_path ?? item.posterPath ?? null;
+		const backdropPath = item.backdrop_path ?? null;
+		const clickedUrl = image?.currentSrc || image?.src || null;
+
 		const selection = {
-			id,
-			type: data.mediaType
+			id: item.id,
+			type: data.mediaType,
+			title: item.title,
+			year: (item.release_date ?? item.releaseDate ?? '').slice(0, 4),
+			posterUrl:
+				morph === 'poster' && clickedUrl
+					? clickedUrl
+					: posterPath
+						? `${IMG}/w500${posterPath}`
+						: null,
+			backdropUrl:
+				morph === 'backdrop' && clickedUrl
+					? clickedUrl
+					: backdropPath
+						? `${IMG}/w1280${backdropPath}`
+						: null
 		};
 
-		localStorage.setItem('selectedMediaId', String(id));
+		if (image) image.style.viewTransitionName = `opening-${morph}`;
+
+		localStorage.setItem('selectedMediaId', String(item.id));
 		localStorage.setItem('selectedMediaType', data.mediaType);
 		localStorage.setItem('selectedMedia', JSON.stringify(selection));
 		goto(resolve('/watch'));
 	}
+
+	/** @param {MouseEvent} event */
+	const imageIn = (event) =>
+		/** @type {HTMLElement} */ (event.currentTarget).querySelector('img') ?? undefined;
+
+	/** @type {HTMLImageElement | undefined} */
+	let heroCover = $state();
+
+	// direction of the Movies ↔ Shows slide: shows sit to the right of movies
+	let direction = $derived(data.mediaType === 'shows' ? 1 : -1);
+
+	/**
+	 * @param {HTMLElement} node
+	 * @param {{ dir: number }} params
+	 */
+	function catalogOut(node, { dir }) {
+		if (reduceMotion) return { duration: 0 };
+		const from = Number(getComputedStyle(node).opacity) || 1;
+		node.style.pointerEvents = 'none';
+		node.style.zIndex = '0';
+		return {
+			duration: 280,
+			easing: cubicIn,
+			css: (/** @type {number} */ t, /** @type {number} */ u) =>
+				`opacity:${t * from};transform:translateX(${-dir * 56 * u}px) scale(${1 - 0.02 * u});filter:blur(${4 * u}px)`
+		};
+	}
+
+	/**
+	 * @param {HTMLElement} node
+	 * @param {{ dir: number }} params
+	 */
+	function catalogIn(node, { dir }) {
+		if (reduceMotion) return { duration: 0 };
+		return {
+			delay: 90,
+			duration: 560,
+			easing: quintOut,
+			css: (/** @type {number} */ t, /** @type {number} */ u) =>
+				`opacity:${t};transform:translateX(${dir * 72 * u}px)`
+		};
+	}
+
+	let reduceMotion = $state(false);
+	$effect(() => {
+		reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	});
 
 	/** @param {'movies' | 'shows'} mediaType */
 	async function changeMedia(mediaType) {
@@ -172,7 +238,8 @@
 
 		try {
 			await invalidateAll();
-			window.scrollTo({ top: 0 });
+			// jump, don't smooth-scroll: the old catalog is already sliding away
+			window.scrollTo({ top: 0, behavior: 'instant' });
 		} finally {
 			pendingType = null;
 		}
@@ -309,7 +376,11 @@
 			{:else if searchResults.length}
 				<div class="search-result-list">
 					{#each searchResults as result (result.id)}
-						<button type="button" class="search-result" onclick={() => openWatch(result.id)}>
+						<button
+							type="button"
+							class="search-result"
+							onclick={(event) => openWatch(result, imageIn(event))}
+						>
 							{#if result.posterPath}
 								<img
 									src={`https://image.tmdb.org/t/p/w185${result.posterPath}`}
@@ -338,100 +409,127 @@
 	{/if}
 </div>
 
-<div class="content" class:switching>
-	{#if hero}
-		<section class="hero" aria-labelledby="hero-title">
-			<img
-				class="hero-cover"
-				src={`https://image.tmdb.org/t/p/original${hero.backdrop_path}`}
-				alt={`Backdrop for ${hero.title}`}
-			/>
+<div class="stack">
+	{#key data.mediaType}
+		<div
+			class="content"
+			class:switching
+			in:catalogIn={{ dir: direction }}
+			out:catalogOut={{ dir: direction }}
+		>
+			{#if hero}
+				<section class="hero" aria-labelledby="hero-title">
+					<img
+						bind:this={heroCover}
+						class="hero-cover"
+						src={`https://image.tmdb.org/t/p/original${hero.backdrop_path}`}
+						alt={`Backdrop for ${hero.title}`}
+					/>
 
-			<button
-				type="button"
-				class="hero-action"
-				onclick={() => openWatch(hero.id)}
-				aria-label={`Watch ${hero.title}`}
-			></button>
+					<button
+						type="button"
+						class="hero-action"
+						onclick={() => openWatch(hero, heroCover, 'backdrop')}
+						aria-label={`Watch ${hero.title}`}
+					></button>
 
-			<div class="hero-copy">
-				<p>Featured</p>
-				<h1 id="hero-title">{hero.title}</h1>
-				<span>{hero.release_date?.slice(0, 4)} · ★ {hero.vote_average?.toFixed(1)}</span>
-			</div>
-
-			<div class="play-overlay" aria-hidden="true">
-				<span class="play-button"><span></span></span>
-			</div>
-		</section>
-	{/if}
-
-	<div class="catalog">
-		{#each sections as section (section.id)}
-			<section class="movie-section" aria-labelledby={`${section.id}-title`}>
-				<header class="section-heading">
-					<div>
-						<p>{section.label}</p>
-						<h2 id={`${section.id}-title`}>{section.title}</h2>
+					<div class="hero-copy">
+						<p>Featured</p>
+						<h1 id="hero-title">{hero.title}</h1>
+						<span>{hero.release_date?.slice(0, 4)} · ★ {hero.vote_average?.toFixed(1)}</span>
 					</div>
-				</header>
 
-				{#if section.id === 'all-titles'}
-					<div
-						class="all-movies-scroll"
-						role="region"
-						aria-label={`Scrollable collection of all ${isShows ? 'shows' : 'movies'}`}
-					>
-						<div class="all-movies-grid">
-							{#each section.movies as movie (movie.id)}
-								<button type="button" class="movie-card" onclick={() => openWatch(movie.id)}>
-									<div class="poster">
-										<img
-											src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
-											alt={`Poster for ${movie.title}`}
-											loading="lazy"
-											draggable="false"
-										/>
-										<div class="card-play" aria-hidden="true">
-											<span><i></i></span>
-										</div>
-									</div>
-									<h3>{movie.title}</h3>
-								</button>
-							{/each}
-						</div>
+					<div class="play-overlay" aria-hidden="true">
+						<span class="play-button"><span></span></span>
 					</div>
-				{:else}
-					<div
-						class="carousel"
-						use:draggable
-						role="region"
-						aria-label={`${section.title} ${isShows ? 'shows' : 'movies'}`}
-					>
-						{#each section.movies as movie (movie.id)}
-							<button type="button" class="movie-card" onclick={() => openWatch(movie.id)}>
-								<div class="poster">
-									<img
-										src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
-										alt={`Poster for ${movie.title}`}
-										loading="lazy"
-										draggable="false"
-									/>
-									<div class="card-play" aria-hidden="true">
-										<span><i></i></span>
-									</div>
+				</section>
+			{/if}
+
+			<div class="catalog">
+				{#each sections as section (section.id)}
+					<section class="movie-section" aria-labelledby={`${section.id}-title`}>
+						<header class="section-heading">
+							<div>
+								<p>{section.label}</p>
+								<h2 id={`${section.id}-title`}>{section.title}</h2>
+							</div>
+						</header>
+
+						{#if section.id === 'all-titles'}
+							<div
+								class="all-movies-scroll"
+								role="region"
+								aria-label={`Scrollable collection of all ${isShows ? 'shows' : 'movies'}`}
+							>
+								<div class="all-movies-grid">
+									{#each section.movies as movie, index (movie.id)}
+										<button
+											type="button"
+											class="movie-card"
+											style:--i={index}
+											onclick={(event) => openWatch(movie, imageIn(event))}
+										>
+											<div class="poster">
+												<img
+													src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+													alt={`Poster for ${movie.title}`}
+													loading="lazy"
+													draggable="false"
+												/>
+												<div class="card-play" aria-hidden="true">
+													<span><i></i></span>
+												</div>
+											</div>
+											<h3>{movie.title}</h3>
+										</button>
+									{/each}
 								</div>
-								<h3>{movie.title}</h3>
-							</button>
-						{/each}
-					</div>
-				{/if}
-			</section>
-		{/each}
-	</div>
+							</div>
+						{:else}
+							<div
+								class="carousel"
+								use:draggable
+								role="region"
+								aria-label={`${section.title} ${isShows ? 'shows' : 'movies'}`}
+							>
+								{#each section.movies as movie, index (movie.id)}
+									<button
+										type="button"
+										class="movie-card"
+										style:--i={index}
+										onclick={(event) => openWatch(movie, imageIn(event))}
+									>
+										<div class="poster">
+											<img
+												src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+												alt={`Poster for ${movie.title}`}
+												loading="lazy"
+												draggable="false"
+											/>
+											<div class="card-play" aria-hidden="true">
+												<span><i></i></span>
+											</div>
+										</div>
+										<h3>{movie.title}</h3>
+									</button>
+								{/each}
+							</div>
+						{/if}
+					</section>
+				{/each}
+			</div>
+		</div>
+	{/key}
 </div>
 
-<nav class="media-toggle" aria-label="Choose what to browse" aria-busy={switching}>
+<nav
+	class="media-toggle"
+	class:shows={toggleType === 'shows'}
+	class:switching
+	aria-label="Choose what to browse"
+	aria-busy={switching}
+>
+	<span class="thumb" aria-hidden="true"></span>
 	<button
 		type="button"
 		class:active={toggleType === 'movies'}
@@ -453,20 +551,29 @@
 		box-sizing: border-box;
 	}
 
+	/* palette in OKLCH: perceptually even lightness, warm-neutral greys tinted toward the gold */
 	:global(:root) {
-		--bg: #090909;
-		--surface: rgba(18, 18, 18, 0.82);
-		--surface-solid: #141414;
-		--poster-bg: #1b1b1b;
-		--fg: #f7f5ef;
-		--muted: rgba(247, 245, 239, 0.56);
-		--dim: rgba(247, 245, 239, 0.38);
-		--line: rgba(247, 245, 239, 0.1);
-		--accent: #efb33d;
+		--bg: oklch(0.14 0.004 80);
+		--surface: oklch(0.19 0.005 80 / 0.82);
+		--surface-solid: oklch(0.19 0.005 80);
+		--raised: oklch(0.23 0.006 80);
+		--poster-bg: oklch(0.21 0.005 80);
+		--fg: oklch(0.97 0.008 95);
+		--muted: oklch(0.97 0.008 95 / 0.56);
+		--dim: oklch(0.97 0.008 95 / 0.38);
+		--hairline: oklch(0.97 0.008 95 / 0.06);
+		--accent: oklch(0.8 0.15 78);
+		--accent-soft: oklch(0.8 0.15 78 / 0.16);
+		--on-accent: oklch(0.16 0.01 78);
+		--green: oklch(0.77 0.16 150);
+		--red: oklch(0.71 0.17 22);
+		--shadow: oklch(0 0 0 / 0.4);
+		--focus-ring: 0 0 0 3px oklch(0.8 0.15 78 / 0.38);
 		--gutter: clamp(1.25rem, 4vw, 4.5rem);
 		--radius: 0.7rem;
 		--radius-lg: 1.1rem;
 		--ease: cubic-bezier(0.16, 1, 0.3, 1);
+		--spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 	}
 
 	:global(html) {
@@ -499,7 +606,8 @@
 		font-size: 0.7rem;
 		font-weight: 800;
 		letter-spacing: 0.26em;
-		text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55);
+		text-shadow: 0 1px 14px oklch(0 0 0 / 0.55);
+		animation: rise 0.7s var(--ease) both;
 	}
 
 	.brand img {
@@ -526,6 +634,7 @@
 		top: clamp(1rem, 3vw, 2rem);
 		right: var(--gutter);
 		width: min(21rem, calc(100vw - 2rem));
+		animation: rise 0.7s var(--ease) 0.08s both;
 	}
 
 	.search-form {
@@ -533,21 +642,20 @@
 		align-items: center;
 		height: 2.75rem;
 		padding-left: 1rem;
-		border: 1px solid var(--line);
 		border-radius: 999px;
 		background: var(--surface);
-		box-shadow: 0 0.5rem 1.75rem rgba(0, 0, 0, 0.35);
+		box-shadow: 0 0.5rem 1.75rem var(--shadow);
 		backdrop-filter: blur(16px);
 		transition:
-			border-color 180ms ease,
+			background-color 180ms ease,
 			box-shadow 180ms ease;
 	}
 
 	.search-form:focus-within {
-		border-color: rgba(239, 179, 61, 0.55);
+		background: oklch(0.22 0.006 80 / 0.9);
 		box-shadow:
-			0 0.5rem 1.75rem rgba(0, 0, 0, 0.35),
-			0 0 0 3px rgba(239, 179, 61, 0.16);
+			0 0.5rem 1.75rem var(--shadow),
+			var(--focus-ring);
 	}
 
 	.search-form input {
@@ -587,11 +695,6 @@
 		color: var(--fg);
 	}
 
-	.search-form button:focus-visible {
-		outline: 2px solid var(--accent);
-		outline-offset: -2px;
-	}
-
 	.search-icon {
 		position: relative;
 		display: block;
@@ -618,13 +721,14 @@
 		margin-top: 0.5rem;
 		padding: 0.4rem;
 		overflow-y: auto;
-		border: 1px solid var(--line);
 		border-radius: var(--radius-lg);
-		background: rgba(14, 14, 14, 0.92);
-		box-shadow: 0 1.25rem 3.5rem rgba(0, 0, 0, 0.55);
+		background: oklch(0.17 0.005 80 / 0.94);
+		box-shadow: 0 1.25rem 3.5rem oklch(0 0 0 / 0.55);
 		backdrop-filter: blur(20px);
-		scrollbar-color: rgba(239, 179, 61, 0.4) transparent;
+		scrollbar-color: oklch(0.8 0.15 78 / 0.4) transparent;
 		scrollbar-width: thin;
+		transform-origin: top right;
+		animation: drop-in 0.32s var(--ease) both;
 	}
 
 	.search-result-list {
@@ -647,11 +751,14 @@
 		font: inherit;
 		text-align: left;
 		cursor: pointer;
-		transition: background-color 140ms ease;
+		transition:
+			background-color 140ms ease,
+			transform 220ms var(--ease);
 	}
 
 	.search-result:hover {
-		background: rgba(247, 245, 239, 0.06);
+		background: var(--hairline);
+		transform: translateX(2px);
 	}
 
 	.search-result > img,
@@ -695,19 +802,30 @@
 	}
 
 	.search-status.error {
-		color: #ff9d8f;
+		color: oklch(0.79 0.12 30);
+	}
+
+	/* old and new catalogs share one grid cell so they can cross-slide during a switch */
+	.stack {
+		display: grid;
 	}
 
 	.content {
 		position: relative;
+		z-index: 1;
+		grid-area: 1 / 1;
 		width: 100%;
+		min-width: 0;
 		overflow: hidden;
 		background: var(--bg);
-		transition: opacity 180ms ease;
+		transition:
+			opacity 220ms ease,
+			filter 220ms ease;
 	}
 
 	.content.switching {
-		opacity: 0.4;
+		opacity: 0.55;
+		filter: saturate(0.6);
 		pointer-events: none;
 	}
 
@@ -719,11 +837,24 @@
 		cursor: pointer;
 	}
 
+	/* keyboard focus: a soft glow instead of a hard outline */
 	.hero-action:focus-visible,
 	.search-result:focus-visible,
+	.search-form button:focus-visible,
+	.media-toggle button:focus-visible {
+		outline: none;
+		box-shadow: var(--focus-ring);
+	}
+
 	.movie-card:focus-visible {
-		outline: 2px solid var(--accent);
-		outline-offset: 3px;
+		outline: none;
+	}
+
+	.movie-card:focus-visible .poster {
+		box-shadow:
+			0 0.9rem 2.25rem oklch(0 0 0 / 0.5),
+			var(--focus-ring);
+		transform: translateY(-0.35rem);
 	}
 
 	.hero-action {
@@ -736,7 +867,7 @@
 	}
 
 	.hero-action:focus-visible {
-		outline-offset: -4px;
+		box-shadow: inset 0 0 0 3px oklch(0.8 0.15 78 / 0.38);
 	}
 
 	.hero::after {
@@ -746,9 +877,9 @@
 		background: linear-gradient(
 			to top,
 			var(--bg) 0%,
-			rgba(9, 9, 9, 0.78) 22%,
-			rgba(9, 9, 9, 0.12) 58%,
-			rgba(9, 9, 9, 0.4) 100%
+			oklch(0.14 0.004 80 / 0.78) 22%,
+			oklch(0.14 0.004 80 / 0.12) 58%,
+			oklch(0.14 0.004 80 / 0.4) 100%
 		);
 		content: '';
 		pointer-events: none;
@@ -761,6 +892,7 @@
 		object-fit: cover;
 		object-position: center 30%;
 		filter: saturate(0.85) brightness(0.92);
+		animation: hero-zoom 2.2s var(--ease) both;
 	}
 
 	.hero-copy {
@@ -772,6 +904,10 @@
 		text-align: right;
 	}
 
+	.hero-copy > * {
+		animation: rise 0.9s var(--ease) both;
+	}
+
 	.hero-copy p {
 		margin: 0 0 0.6rem;
 		color: var(--accent);
@@ -779,6 +915,7 @@
 		font-weight: 800;
 		letter-spacing: 0.2em;
 		text-transform: uppercase;
+		animation-delay: 0.25s;
 	}
 
 	.hero-copy h1 {
@@ -789,6 +926,7 @@
 		letter-spacing: -0.055em;
 		line-height: 0.9;
 		text-wrap: balance;
+		animation-delay: 0.35s;
 	}
 
 	.hero-copy > span {
@@ -799,6 +937,7 @@
 		font-weight: 650;
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
+		animation-delay: 0.48s;
 	}
 
 	.play-overlay,
@@ -808,22 +947,25 @@
 		inset: 0;
 		display: grid;
 		place-items: center;
-		background: rgba(9, 9, 9, 0.4);
+		background: oklch(0.14 0.004 80 / 0.4);
 		opacity: 0;
 		pointer-events: none;
 		transition: opacity 220ms ease;
 	}
 
+	/* play buttons: frosted disc, no ring */
 	.play-button,
 	.card-play > span {
 		display: grid;
 		place-items: center;
-		border: 1px solid rgba(247, 245, 239, 0.62);
 		border-radius: 50%;
-		background: rgba(9, 9, 9, 0.32);
-		backdrop-filter: blur(3px);
+		background: oklch(0.97 0.008 95 / 0.16);
+		box-shadow: 0 0.5rem 1.5rem oklch(0 0 0 / 0.35);
+		backdrop-filter: blur(8px);
 		transform: scale(0.84);
-		transition: transform 260ms var(--ease);
+		transition:
+			transform 300ms var(--spring),
+			background-color 200ms ease;
 	}
 
 	.play-button {
@@ -846,7 +988,12 @@
 	}
 
 	.hero:hover .play-button {
+		background: oklch(0.8 0.15 78 / 0.85);
 		transform: scale(1);
+	}
+
+	.hero:hover .play-button > span {
+		border-left-color: var(--on-accent);
 	}
 
 	.catalog {
@@ -855,7 +1002,9 @@
 		padding: clamp(2.5rem, 5vw, 4rem) 0 7.5rem;
 	}
 
+	/* Movies / Shows switch with a sliding thumb */
 	.media-toggle {
+		--option: 5.6rem;
 		position: fixed;
 		z-index: 50;
 		bottom: max(1.25rem, env(safe-area-inset-bottom));
@@ -863,17 +1012,46 @@
 		display: flex;
 		gap: 0.2rem;
 		padding: 0.28rem;
-		border: 1px solid var(--line);
 		border-radius: 999px;
 		background: var(--surface);
-		box-shadow: 0 0.75rem 2.25rem rgba(0, 0, 0, 0.5);
+		box-shadow: 0 0.75rem 2.25rem oklch(0 0 0 / 0.5);
 		backdrop-filter: blur(16px);
 		transform: translateX(-50%);
+		animation: toggle-in 0.8s var(--ease) 0.3s both;
+	}
+
+	.media-toggle .thumb {
+		position: absolute;
+		top: 0.28rem;
+		bottom: 0.28rem;
+		left: 0.28rem;
+		width: var(--option);
+		overflow: hidden;
+		border-radius: 999px;
+		background: var(--accent);
+		box-shadow: 0 0.3rem 1rem oklch(0.8 0.15 78 / 0.3);
+		transition: transform 480ms var(--spring);
+	}
+
+	.media-toggle.shows .thumb {
+		transform: translateX(calc(var(--option) + 0.2rem));
+	}
+
+	/* while the other catalog loads, light runs across the thumb */
+	.media-toggle.switching .thumb::after {
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(100deg, transparent 25%, oklch(1 0 0 / 0.55), transparent 75%);
+		content: '';
+		transform: translateX(-100%);
+		animation: sweep 0.9s ease-in-out infinite;
 	}
 
 	.media-toggle button {
-		min-width: 5.25rem;
-		padding: 0.65rem 1.1rem;
+		position: relative;
+		z-index: 1;
+		width: var(--option);
+		padding: 0.65rem 0;
 		border: 0;
 		border-radius: 999px;
 		background: transparent;
@@ -883,9 +1061,7 @@
 		font-weight: 700;
 		letter-spacing: 0.03em;
 		cursor: pointer;
-		transition:
-			background-color 180ms ease,
-			color 180ms ease;
+		transition: color 260ms ease;
 	}
 
 	.media-toggle button:hover {
@@ -893,13 +1069,7 @@
 	}
 
 	.media-toggle button.active {
-		background: var(--accent);
-		color: #0a0a0a;
-	}
-
-	.media-toggle button:focus-visible {
-		outline: 2px solid var(--fg);
-		outline-offset: 2px;
+		color: var(--on-accent);
 	}
 
 	.media-toggle button:disabled {
@@ -973,6 +1143,7 @@
 		padding: 0.5rem 0 1rem;
 	}
 
+	/* cards cascade in, capped so long rows don't wait forever */
 	.movie-card {
 		min-width: 0;
 		padding: 0;
@@ -984,6 +1155,8 @@
 		text-align: left;
 		cursor: pointer;
 		scroll-snap-align: start;
+		animation: card-in 0.6s var(--ease) both;
+		animation-delay: calc(min(var(--i, 0), 10) * 45ms + 140ms);
 	}
 
 	.poster {
@@ -992,10 +1165,10 @@
 		overflow: hidden;
 		border-radius: var(--radius);
 		background: var(--poster-bg);
-		box-shadow: 0 0.4rem 1.4rem rgba(0, 0, 0, 0.34);
+		box-shadow: 0 0.4rem 1.4rem oklch(0 0 0 / 0.34);
 		transition:
-			transform 300ms var(--ease),
-			box-shadow 300ms var(--ease);
+			transform 340ms var(--ease),
+			box-shadow 340ms var(--ease);
 	}
 
 	.poster > img {
@@ -1004,7 +1177,9 @@
 		height: 100%;
 		object-fit: cover;
 		pointer-events: none;
-		transition: filter 250ms ease;
+		transition:
+			filter 250ms ease,
+			transform 600ms var(--ease);
 	}
 
 	.card-play > span {
@@ -1020,12 +1195,13 @@
 	}
 
 	.movie-card:hover .poster {
-		box-shadow: 0 0.9rem 2.25rem rgba(0, 0, 0, 0.5);
+		box-shadow: 0 0.9rem 2.25rem oklch(0 0 0 / 0.5);
 		transform: translateY(-0.35rem);
 	}
 
 	.poster:hover > img {
 		filter: brightness(0.55);
+		transform: scale(1.04);
 	}
 
 	.poster:hover .card-play {
@@ -1034,6 +1210,11 @@
 
 	.poster:hover .card-play > span {
 		transform: scale(1);
+	}
+
+	.movie-card:active .poster {
+		transform: translateY(-0.15rem) scale(0.98);
+		transition-duration: 120ms;
 	}
 
 	.movie-card h3 {
@@ -1051,6 +1232,47 @@
 
 	.movie-card:hover h3 {
 		color: var(--fg);
+	}
+
+	@keyframes rise {
+		from {
+			opacity: 0;
+			transform: translateY(14px);
+		}
+	}
+
+	@keyframes hero-zoom {
+		from {
+			opacity: 0;
+			transform: scale(1.08);
+		}
+	}
+
+	@keyframes card-in {
+		from {
+			opacity: 0;
+			transform: translateY(18px) scale(0.97);
+		}
+	}
+
+	@keyframes drop-in {
+		from {
+			opacity: 0;
+			transform: translateY(-6px) scale(0.98);
+		}
+	}
+
+	@keyframes toggle-in {
+		from {
+			opacity: 0;
+			transform: translate(-50%, 24px);
+		}
+	}
+
+	@keyframes sweep {
+		to {
+			transform: translateX(100%);
+		}
 	}
 
 	@media (max-width: 640px) {
@@ -1113,6 +1335,17 @@
 			scroll-behavior: auto;
 		}
 
+		.brand,
+		.search-shell,
+		.search-results,
+		.hero-cover,
+		.hero-copy > *,
+		.media-toggle,
+		.movie-card,
+		.media-toggle .thumb::after {
+			animation: none;
+		}
+
 		.content,
 		.play-overlay,
 		.card-play,
@@ -1120,11 +1353,14 @@
 		.card-play > span,
 		.poster,
 		.poster > img,
-		.movie-card h3 {
+		.movie-card h3,
+		.media-toggle .thumb,
+		.search-result {
 			transition: none;
 		}
 
-		.movie-card:hover .poster {
+		.movie-card:hover .poster,
+		.poster:hover > img {
 			transform: none;
 		}
 	}

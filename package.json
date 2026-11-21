@@ -26,6 +26,9 @@
 	},
 	"dependencies": {
 		"@blacktiger/tmdb": "^0.23.1",
-		"@sveltejs/adapter-node": "^5.5.7"
+		"@p-stream/providers": "github:movie-web-rip/pstream-providers#production",
+		"@sveltejs/adapter-node": "^5.5.7",
+		"happy-dom": "^21.0.1",
+		"hls.js": "^1.7.4"
 	}
 }

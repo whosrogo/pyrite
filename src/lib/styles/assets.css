@@ -1,5 +1,5 @@
 body, html {
-	background-color: black;
+	background-color: oklch(0.14 0.004 80);
 	margin: 0px;
   width: 100%;
 }

@@ -20,7 +20,9 @@ export async function GET({ fetch, url }) {
 			})
 		);
 
-	const requested = Number(url.searchParams.get('season'));
+	// Number(null) is 0, which would match the "Specials" season when none was asked for
+	const rawSeason = url.searchParams.get('season');
+	const requested = rawSeason === null || rawSeason === '' ? NaN : Number(rawSeason);
 	const fallback = seasons.find(/** @param {{ number: number }} item */ (item) => item.number > 0);
 	const season = seasons.some(
 		/** @param {{ number: number }} item */ (item) => item.number === requested

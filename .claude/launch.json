@@ -1,0 +1,12 @@
+{
+	"version": "0.0.1",
+	"configurations": [
+		{
+			"name": "pyrite-dev",
+			"runtimeExecutable": "bun",
+			"runtimeArgs": ["run", "dev"],
+			"port": 1234,
+			"url": "http://localhost:1234"
+		}
+	]
+}

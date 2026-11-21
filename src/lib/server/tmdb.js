@@ -21,6 +21,21 @@ async function request(requestFetch, path) {
 	return response.json();
 }
 
+/**
+ * Generic TMDB GET used by the stream scrapers (no SvelteKit fetch available there).
+ * @param {string} path
+ * @param {Record<string, string | number | undefined | null>} [params]
+ */
+export function tmdb(path, params = {}) {
+	const query = new URLSearchParams();
+	for (const [key, value] of Object.entries(params)) {
+		if (value != null) query.set(key, String(value));
+	}
+	const qs = query.size ? `?${query}` : '';
+
+	return request(fetch, `${path}${qs}`);
+}
+
 /** @param {string} keywordIds */
 function excludedKeywords(keywordIds) {
 	return keywordIds ? `&without_keywords=${encodeURIComponent(keywordIds)}` : '';
@@ -112,27 +127,6 @@ export function getMediaDetails(requestFetch, id, mediaType) {
  */
 export function getSeason(requestFetch, id, season) {
 	return request(requestFetch, `/tv/${encodeURIComponent(id)}/season/${season}?language=en-US`);
-}
-
-const ANIMATION_GENRE_ID = 16;
-
-/**
- * @param {Record<string, any>} details
- * @param {'movies' | 'shows'} mediaType
- * @returns {'movies' | 'shows' | 'anime'}
- */
-export function categorizeMedia(details, mediaType) {
-	const isAnimated = (details.genres ?? []).some(
-		/** @param {{ id: number }} genre */ (genre) => genre.id === ANIMATION_GENRE_ID
-	);
-	const isJapanese =
-		details.original_language === 'ja' ||
-		(details.origin_country ?? []).includes('JP') ||
-		(details.production_countries ?? []).some(
-			/** @param {{ iso_3166_1: string }} country */ (country) => country.iso_3166_1 === 'JP'
-		);
-
-	return isAnimated && isJapanese ? 'anime' : mediaType;
 }
 
 /**
