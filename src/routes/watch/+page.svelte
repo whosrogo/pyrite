@@ -19,7 +19,7 @@
 	let failedIds = $state([]);
 	let activeId = $state('');
 
-	/** @type {'checking' | 'ready' | 'empty' | 'error' | 'missing'} */
+	/** @type {'checking' | 'ready' | 'empty' | 'error' | 'missing' | 'disabled'} */
 	let status = $state('checking');
 
 	/** @type {Array<{ number: number, name: string, episodeCount: number }>} */
@@ -113,6 +113,10 @@
 			const payload = await response.json();
 			category = payload.category ?? selectedType;
 			probed = payload.sources ?? [];
+			if (payload.disabled) {
+				status = 'disabled';
+				return;
+			}
 			playBest();
 		} catch {
 			probed = [];
@@ -193,7 +197,9 @@
 				{:else if status === 'error'}
 					<p>Could not reach the source check.</p>
 					<button type="button" onclick={checkSources}>Try again</button>
-				{:else}
+				{:else if status === 'disabled'}
+						<p class="error">All sources are disabled.</p>
+					{:else}
 					<p>No working source for this title right now.</p>
 					<button type="button" onclick={checkSources}>Check again</button>
 				{/if}
@@ -223,15 +229,13 @@
 		</nav>
 	{/if}
 
-	{#if probed.length}
+	{#if available.length}
 		<nav class="sources" aria-label={categoryLabels[category]}>
 			<p class="sources-label">{categoryLabels[category]}</p>
-			{#each probed as source (source.id)}
+			{#each available as source (source.id)}
 				<button
 					type="button"
 					class:active={source.id === activeId}
-					class:down={!source.ok || failedIds.includes(source.id)}
-					disabled={!source.ok || failedIds.includes(source.id)}
 					onclick={() => play(source.id)}
 				>
 					<span class="dot" aria-hidden="true"></span>
@@ -312,6 +316,10 @@
 		color: rgba(255, 255, 255, 0.68);
 		font-size: 0.85rem;
 		letter-spacing: 0.02em;
+	}
+
+	.overlay p.error {
+		color: #ff6b6b;
 	}
 
 	.overlay button {
@@ -407,11 +415,6 @@
 		color: #0a0a0a;
 	}
 
-	.sources button.down {
-		color: rgba(255, 255, 255, 0.3);
-		cursor: not-allowed;
-	}
-
 	.dot {
 		width: 0.42rem;
 		height: 0.42rem;
@@ -423,7 +426,4 @@
 		background: #0a0a0a;
 	}
 
-	.sources button.down .dot {
-		background: #6a3a3a;
-	}
 </style>

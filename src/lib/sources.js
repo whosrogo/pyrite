@@ -1,10 +1,12 @@
 /**
- * @typedef {'movies' | 'shows' | 'anime'} SourceCategory
+ * @typedef {'movies' | 'shows'} SourceCategory
  * @typedef {{ id: string, type: 'movies' | 'shows', season?: number, episode?: number }} Media
  * @typedef {{
  *   id: string,
  *   label: string,
  *   priority: number,
+ *   enabled?: boolean,
+ *   down?: boolean,
  *   url: (media: Media) => string
  * }} Source
  */
@@ -29,146 +31,46 @@ export function formatURL(target, endpoint) {
 
 /** @type {Source[]} */
 export const movieSources = [
-	{
-		id: 'vidfast',
-		label: 'Vidfast',
-		priority: 6,
-		url: ({ id }) => `https://tinyurl.com/3tv998w5/movie/${id}?autoPlay=true
-`
-	},
-	{
-		id: 'nebulaflix',
-		label: 'Nebulaflix',
-		priority: 5,
-		url: ({ id }) => `https://tinyurl.com/44yxvzku/player?mt=${id}`
-	},
-	{
-		id: 'mapple',
-		label: 'Mapple',
-		priority: 4,
-		url: ({ id }) => `https://tinyurl.com/mtr5drt8/watch/movie/${id}`
-	},
-	{
-		id: 'vidzee',
-		label: 'Vidzee',
-		priority: 3,
-		url: ({ id }) => `https://tinyurl.com/4mm3msn9/embed/movie/${id}`
-	},
-	{
-		id: 'videasy',
-		label: 'Videasy',
-		priority: 2,
-		url: ({ id }) => `https://tinyurl.com/bdek4j5w/movie/${id}`
-	},
-	{
-		id: '111movies',
-		label: '111Movies',
-		priority: 1,
-		url: ({ id }) => `https://tinyurl.com/y8t5bx23/movie/${id}`
-	}
+	{ id: 'vidspark', label: 'VidSpark', priority: 3, url: ({ id }) => `https://vidspark.to/movie/${id}` },
+	{ id: 'vixsrc', label: 'VixSrc', priority: 4, url: ({ id }) => `https://vixsrc.to/movie/${id}` },
+	{ id: 'vidzee', label: 'VidZee', priority: 5, url: ({ id }) => `https://player.vidzee.wtf/embed/movie/${id}` },
+	{ id: 'vidrock', label: 'VidRock', priority: 6, url: ({ id }) => `https://vidrock.net/movie/${id}` },
+	{ id: 'twoembed', label: '2Embed', priority: 7, url: ({ id }) => `https://vidsrc.buzz/embed/movie/${id}` },
+	{ id: 'vidfast', label: 'VidFast', priority: 9, url: ({ id }) => `https://vidfast.vc/movie/${id}?autoPlay=true` },
+	{ id: 'vidcore', label: 'VidCore', priority: 10, url: ({ id }) => `https://vidcore.io/movie/${id}` },
+	{ id: 'vidup', label: 'VidUp', priority: 11, url: ({ id }) => `https://vidup.to/movie/${id}` }
 ];
 
 /** @type {Source[]} */
 export const showSources = [
-	{
-		id: 'vidfast',
-		label: 'Vidfast',
-		priority: 7,
-		url: ({ id, season, episode }) =>
-			`https://tinyurl.com/3tv998w5/tv/${id}/${season}/${episode}?autoPlay=true`
-	},
-	{
-		id: 'nebulaflix',
-		label: 'Nebulaflix',
-		priority: 1,
-		url: ({
-			id,
-			season,
-			episode
-		}) => `https://tinyurl.com/44yxvzku/player?st=${id}&season=${season}&episode=${episode}
-`
-	},
-	{
-		id: '111movies',
-		label: '111movies',
-		priority: 2,
-		url: ({ id, season, episode }) => `https://tinyurl.com/y8t5bx23/tv/${id}/${season}/${episode}`
-	},
-	{
-		id: 'vidzee',
-		label: 'Vidzee',
-		priority: 3,
-		url: ({ id, season, episode }) =>
-			`https://tinyurl.com/4mm3msn9/embed/tv/${id}/${season}/${episode}`
-	},
-	{
-		id: 'videasy',
-		label: 'Videasy',
-		priority: 6,
-		url: ({ id, season, episode }) => `https://tinyurl.com/bdek4j5w/tv/${id}/${season}/${episode}`
-	}
-];
-
-/** @type {Source[]} */
-export const animeSources = [
-	{
-		id: 'vidfast',
-		label: 'Vidfast',
-		priority: 3,
-		url: ({ id, season, episode }) =>
-			`https://tinyurl.com/3tv998w5/tv/${id}/${season}/${episode}?autoPlay=true`
-	},
-	{
-		id: 'nebulaflix',
-		label: 'Nebulaflix',
-		priority: 2,
-		url: ({
-			id,
-			season,
-			episode
-		}) => `https://tinyurl.com/44yxvzku/player?st=${id}&season=${season}&episode=${episode}
-`
-	},
-	{
-		id: '111movies',
-		label: '111movies',
-		priority: 5,
-		url: ({ id, season, episode }) => `https://tinyurl.com/y8t5bx23/tv/${id}/${season}/${episode}`
-	},
-	{
-		id: 'vidzee',
-		label: 'Vidzee',
-		priority: 4,
-		url: ({ id, season, episode }) =>
-			`https://tinyurl.com/4mm3msn9/embed/tv/${id}/${season}/${episode}`
-	},
-	{
-		id: 'videasy',
-		label: 'Videasy',
-		priority: 1,
-		url: ({ id, season, episode }) => `https://tinyurl.com/bdek4j5w/tv/${id}/${season}/${episode}`
-	}
+	{ id: 'vidspark', label: 'VidSpark', priority: 3, url: ({ id, season, episode }) => `https://vidspark.to/tv/${id}/${season}/${episode}` },
+	{ id: 'vixsrc', label: 'VixSrc', priority: 4, url: ({ id, season, episode }) => `https://vixsrc.to/tv/${id}/${season}/${episode}` },
+	{ id: 'vidzee', label: 'VidZee', priority: 5, url: ({ id, season, episode }) => `https://player.vidzee.wtf/embed/tv/${id}/${season}/${episode}` },
+	{ id: 'vidrock', label: 'VidRock', priority: 6, url: ({ id, season, episode }) => `https://vidrock.net/tv/${id}/${season}/${episode}` },
+	{ id: 'vidnest', label: 'VidNest', priority: 8, url: ({ id, season, episode }) => `https://vidnest.fun/tv/${id}/${season}/${episode}` },
+	{ id: 'vidfast', label: 'VidFast', priority: 9, url: ({ id, season, episode }) => `https://vidfast.vc/tv/${id}/${season}/${episode}?autoPlay=true` },
+	{ id: 'vidcore', label: 'VidCore', priority: 10, url: ({ id, season, episode }) => `https://vidcore.io/tv/${id}/${season}/${episode}` },
+	{ id: 'vidup', label: 'VidUp', priority: 11, url: ({ id, season, episode }) => `https://vidup.to/tv/${id}/${season}/${episode}` }
 ];
 
 /** @type {Record<SourceCategory, Source[]>} */
 export const sourcesByCategory = {
 	movies: movieSources,
-	shows: showSources,
-	anime: animeSources
+	shows: showSources
 };
 
 /** @type {Record<SourceCategory, string>} */
 export const categoryLabels = {
 	movies: 'Movie sources',
-	shows: 'Show sources',
-	anime: 'Anime sources'
+	shows: 'Show sources'
 };
 
 /** @param {Media & { category?: SourceCategory, proxy?: string }} media */
 export function buildCandidates({ id, type, category, season, episode, proxy }) {
-	const list = sourcesByCategory[category ?? type] ?? sourcesByCategory[type];
+	const list = sourcesByCategory[category ?? type] ?? sourcesByCategory[type] ?? [];
 
 	return [...list]
+		.filter((source) => source.enabled !== false && !source.down)
 		.sort((a, b) => a.priority - b.priority)
 		.map((source) => ({
 			id: source.id,

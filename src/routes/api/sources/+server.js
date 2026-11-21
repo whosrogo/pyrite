@@ -107,6 +107,17 @@ export async function GET({ fetch, url }) {
 	const episode = Number(url.searchParams.get('episode')) || 1;
 	const category = await resolveCategory(fetch, url.searchParams.get('category'), id, mediaType);
 	const candidates = buildCandidates({ id, type: mediaType, category, season, episode, proxy });
+
+	if (!candidates.length) {
+		return json({
+			category,
+			proxy: proxy ?? null,
+			sources: [],
+			available: [],
+			best: null,
+			disabled: true
+		});
+	}
 	const results = await Promise.all(
 		candidates.map(async (candidate) => ({
 			...candidate,
