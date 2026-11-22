@@ -59,7 +59,16 @@ function startJob(type, tmdbId, season, episode, prefer) {
 		for (const listener of job.listeners) listener(event);
 	};
 
-	const all = [...PROVIDERS, ...pstreamTasks(type)];
+	// source ids must be unique: the player keys its lists by them. p-stream can reuse
+	// an id we also use for a custom scraper (it has its own "vidnest"), so number repeats.
+	/** @type {Set<string>} */
+	const usedIds = new Set();
+	const all = [...PROVIDERS, ...pstreamTasks(type)].map((task) => {
+		let id = task.id;
+		for (let n = 2; usedIds.has(id); n++) id = `${task.id}-${n}`;
+		usedIds.add(id);
+		return id === task.id ? task : { ...task, id };
+	});
 	// kick the preferred source off first so it isn't queued behind the heavy sandboxes
 	const ordered = prefer
 		? [...all.filter((task) => task.id === prefer), ...all.filter((task) => task.id !== prefer)]

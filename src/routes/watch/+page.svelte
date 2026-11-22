@@ -555,13 +555,19 @@
 
 	/**
 	 * One button per server, keeping its highest quality; unlabeled mirrors stay separate.
+	 * The URL is the stream's identity (lists are keyed by it), so when two sources hand
+	 * back the same URL only the first one is kept.
 	 * @param {RawStream[]} list
 	 * @returns {Stream[]}
 	 */
 	function groupStreams(list) {
 		/** @type {Map<string, RawStream>} */
 		const best = new Map();
+		/** @type {Set<string>} */
+		const seenUrls = new Set();
 		for (const stream of list) {
+			if (seenUrls.has(stream.url)) continue;
+			seenUrls.add(stream.url);
 			const key = `${stream.providerName}:${stream.type}${stream.quality ? '' : `:${stream.url}`}`;
 			const current = best.get(key);
 			if (!current || qualityNumber(stream) > qualityNumber(current)) best.set(key, stream);
