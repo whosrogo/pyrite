@@ -4,7 +4,7 @@
 	import { onMount } from 'svelte';
 	import { flip } from 'svelte/animate';
 	import { cubicOut } from 'svelte/easing';
-	import { fly, scale } from 'svelte/transition';
+	import { fly } from 'svelte/transition';
 
 	// no playback within this long counts as a failure and moves on to the next stream
 	const STALL_TIMEOUT = 15000;
@@ -230,9 +230,8 @@
 		return `${resolve('/api/subtitles/file')}?${params}`;
 	}
 
-	/** @param {Event} event */
-	function handleSubtitleChange(event) {
-		const value = /** @type {HTMLSelectElement} */ (event.currentTarget).value;
+	/** @param {string} value an option key, or 'off' */
+	function pickSubtitle(value) {
 		manualSubtitle = value;
 		const option = subtitleOptions.find((item) => item.key === value);
 		subtitlePref = value === 'off' ? 'off' : (option?.language ?? subtitlePref);
@@ -424,9 +423,15 @@
 			ready.finally(scrape);
 		}
 
+		const onFullscreen = () => (isFullscreen = document.fullscreenElement === playerEl);
+		document.addEventListener('fullscreenchange', onFullscreen);
+		wake();
+
 		return () => {
 			search?.abort();
 			stopPlayback();
+			window.clearTimeout(idleTimer);
+			document.removeEventListener('fullscreenchange', onFullscreen);
 		};
 	});
 
@@ -468,10 +473,81 @@
 		scrape();
 	}
 
-	/** @param {Event} event */
-	function handleEpisodeChange(event) {
-		episode = Number(/** @type {HTMLSelectElement} */ (event.currentTarget).value);
+	/** @param {number} number */
+	function pickEpisode(number) {
+		openPanel = null;
+		if (number === episode) return;
+		episode = number;
 		scrape();
+	}
+
+	// ---- floating player chrome: dock + panels, auto-hidden while watching ----
+	const IDLE_DELAY = 2800;
+	/** @type {'servers' | 'subtitles' | 'episodes' | null} */
+	let openPanel = $state(null);
+	let idle = $state(false);
+	let paused = $state(true);
+	let isFullscreen = $state(false);
+	let dockHovered = false;
+	let idleTimer = 0;
+	/** @type {HTMLDivElement | undefined} */
+	let playerEl = $state();
+	/** @type {HTMLDivElement | undefined} */
+	let dockEl = $state();
+
+	let chromeHidden = $derived.by(
+		() => idle && status === 'playing' && !paused && openPanel === null
+	);
+
+	function wake() {
+		idle = false;
+		window.clearTimeout(idleTimer);
+		idleTimer = window.setTimeout(() => {
+			if (!dockHovered) idle = true;
+		}, IDLE_DELAY);
+	}
+
+	/** @param {'servers' | 'subtitles' | 'episodes'} name */
+	function togglePanel(name) {
+		openPanel = openPanel === name ? null : name;
+		wake();
+	}
+
+	/** @param {PointerEvent} event */
+	function handleWindowPointerDown(event) {
+		if (openPanel && dockEl && !dockEl.contains(/** @type {Node} */ (event.target))) {
+			openPanel = null;
+		}
+	}
+
+	/** @param {KeyboardEvent} event */
+	function handleWindowKeydown(event) {
+		if (event.key === 'Escape' && openPanel) {
+			openPanel = null;
+			return;
+		}
+		wake();
+	}
+
+	// fullscreen the whole player (not just <video>) so the dock stays usable
+	async function toggleFullscreen() {
+		try {
+			if (document.fullscreenElement) await document.exitFullscreen();
+			else await playerEl?.requestFullscreen();
+		} catch {
+			// fullscreen can be refused (iframes, some mobile browsers); nothing to do
+		}
+	}
+
+	/** @param {MouseEvent} event */
+	function handleVideoDoubleClick(event) {
+		event.preventDefault();
+		toggleFullscreen();
+	}
+
+	/** Scrolls the selected row of a panel list into view when the panel opens. */
+	function revealSelected(/** @type {HTMLElement} */ node) {
+		node.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'center' });
 	}
 
 	/** @param {{ quality?: string }} stream */
@@ -739,12 +815,39 @@
 	<title>Pyrite — {meta?.title ?? 'Watch'}</title>
 </svelte:head>
 
-<main>
-	<button class="back" type="button" onclick={() => goto(resolve('/'))}>← Back to browse</button>
+<svelte:window onpointerdown={handleWindowPointerDown} onkeydown={handleWindowKeydown} />
 
-	<div class="player">
+<main>
+	<button
+		class="back"
+		class:hidden={chromeHidden}
+		type="button"
+		aria-label="Back to browse"
+		onclick={() => goto(resolve('/'))}
+	>
+		<span aria-hidden="true">←</span><span class="back-text" aria-hidden="true">Back to browse</span
+		>
+	</button>
+
+	<div
+		class="player"
+		class:idle={chromeHidden}
+		bind:this={playerEl}
+		onpointermove={wake}
+		onpointerdown={wake}
+		role="presentation"
+	>
 		<!-- svelte-ignore a11y_media_has_caption -->
-		<video bind:this={video} class:revealed={status === 'playing'} controls autoplay playsinline>
+		<video
+			bind:this={video}
+			bind:paused
+			class:revealed={status === 'playing'}
+			controls
+			controlslist="nofullscreen noremoteplayback"
+			autoplay
+			playsinline
+			ondblclick={handleVideoDoubleClick}
+		>
 			{#if selectedSubtitle?.kind === 'file'}
 				{@const subtitle = selectedSubtitle}
 				{#key `${subtitle.key}|${activeUrl}`}
@@ -873,98 +976,266 @@
 				</div>
 			</div>
 		{/if}
-	</div>
-
-	{#if seasons.length || subtitleOptions.length}
-		<nav class="episodes" aria-label="Season, episode and subtitles">
-			{#if seasons.length}
-				<label>
-					<span>Season</span>
-					<select value={season} onchange={handleSeasonChange}>
-						{#each seasons as item (item.number)}
-							<option value={item.number}>{item.name}</option>
-						{/each}
-					</select>
-				</label>
-
-				<label>
-					<span>Episode</span>
-					<select value={episode} onchange={handleEpisodeChange}>
-						{#each episodes as item (item.number)}
-							<option value={item.number}>{item.number}. {item.name}</option>
-						{/each}
-					</select>
-				</label>
-			{/if}
-
-			{#if subtitleOptions.length}
-				<label>
-					<span>Subtitles</span>
-					<select value={selectedSubtitle?.key ?? 'off'} onchange={handleSubtitleChange}>
-						<option value="off">Off</option>
-						{#if streamSubtitles.length}
-							<optgroup label="From this server">
-								{#each streamSubtitles as option (option.key)}
-									<option value={option.key}>{option.label}</option>
-								{/each}
-							</optgroup>
+		{#if status !== 'missing'}
+			<div
+				class="dock"
+				class:hidden={chromeHidden}
+				bind:this={dockEl}
+				onpointerenter={() => (dockHovered = true)}
+				onpointerleave={() => (dockHovered = false)}
+				role="group"
+				aria-label="Player settings"
+			>
+				<div class="dock-bar">
+					<button
+						type="button"
+						class="dock-button"
+						class:open={openPanel === 'servers'}
+						aria-expanded={openPanel === 'servers'}
+						aria-controls="panel-servers"
+						onclick={() => togglePanel('servers')}
+					>
+						<svg viewBox="0 0 24 24" aria-hidden="true"
+							><path
+								d="M4 5h16v5H4zM4 14h16v5H4zM7 7.5h.01M7 16.5h.01"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/></svg
+						>
+						<span class="dock-label">
+							{active?.label ?? (searching ? 'Finding servers' : 'Servers')}
+						</span>
+						{#if active?.quality}<span class="dock-tag">{active.quality}</span>{/if}
+						{#if searching}
+							<span class="live-dot" title="Still searching">
+								<span class="visually-hidden">still searching</span>
+							</span>
+						{:else if streams.length}
+							<span class="dock-count">{streams.length}</span>
 						{/if}
-						{#each titleSubtitleGroups as [name, options] (name)}
-							<optgroup label={name}>
-								{#each options as option (option.key)}
-									<option value={option.key}>{option.label}</option>
-								{/each}
-							</optgroup>
-						{/each}
-					</select>
-				</label>
+					</button>
 
-				{#if selectedSubtitle?.kind === 'file'}
-					<div class="sub-offset" role="group" aria-label="Subtitle timing">
+					{#if subtitleOptions.length}
 						<button
 							type="button"
-							onclick={() => nudgeSubtitles(-0.5)}
-							aria-label="Subtitles earlier">−</button
+							class="dock-button"
+							class:open={openPanel === 'subtitles'}
+							class:on={!!selectedSubtitle}
+							aria-expanded={openPanel === 'subtitles'}
+							aria-controls="panel-subtitles"
+							onclick={() => togglePanel('subtitles')}
 						>
-						<span>{subtitleOffset > 0 ? '+' : ''}{subtitleOffset.toFixed(1)}s</span>
-						<button type="button" onclick={() => nudgeSubtitles(0.5)} aria-label="Subtitles later"
-							>+</button
-						>
-					</div>
-				{/if}
-			{/if}
-		</nav>
-	{/if}
+							<svg viewBox="0 0 24 24" aria-hidden="true"
+								><rect
+									x="3"
+									y="5"
+									width="18"
+									height="14"
+									rx="3"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								/><path
+									d="M10.5 10.2a2.2 2.2 0 1 0 0 3.6M17 10.2a2.2 2.2 0 1 0 0 3.6"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.8"
+									stroke-linecap="round"
+								/></svg
+							>
+							<span class="dock-label">{selectedSubtitle?.label ?? 'Subtitles off'}</span>
+						</button>
+					{/if}
 
-	{#if streams.length}
-		<nav class="sources" aria-label="Servers">
-			<p class="sources-label">
-				Servers
-				{#if searching && status === 'playing'}
-					<span class="live" transition:scale={{ duration: 200 }}>
-						<span class="live-dot" aria-hidden="true"></span>
-						still searching · {remaining} left
-					</span>
+					{#if seasons.length}
+						<button
+							type="button"
+							class="dock-button"
+							class:open={openPanel === 'episodes'}
+							aria-expanded={openPanel === 'episodes'}
+							aria-controls="panel-episodes"
+							onclick={() => togglePanel('episodes')}
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true"
+								><path
+									d="M4 6h16M4 12h16M4 18h10"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+								/></svg
+							>
+							<span class="dock-label always">S{season} · E{episode}</span>
+						</button>
+					{/if}
+
+					<button
+						type="button"
+						class="dock-button icon-only"
+						aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+						title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+						onclick={toggleFullscreen}
+					>
+						<svg viewBox="0 0 24 24" aria-hidden="true"
+							><path
+								d={isFullscreen
+									? 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5'
+									: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'}
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/></svg
+						>
+					</button>
+				</div>
+
+				{#if openPanel === 'servers'}
+					<section id="panel-servers" class="panel" aria-label="Servers">
+						<header class="panel-head">
+							<h2>Servers</h2>
+							{#if searching}
+								<span class="panel-note">
+									<span class="live-dot" aria-hidden="true"></span>
+									searching · {remaining} left
+								</span>
+							{/if}
+						</header>
+						{#if streams.length}
+							<ul class="panel-list" use:revealSelected>
+								{#each streams as stream (stream.url)}
+									{@const isActive = stream.url === activeUrl}
+									{@const isDead = deadUrls.includes(stream.url)}
+									<li>
+										<button
+											type="button"
+											class="row"
+											class:selected={isActive}
+											class:dead={isDead}
+											class:trying={isActive && status === 'loading'}
+											aria-pressed={isActive}
+											onclick={() => play(stream.url)}
+										>
+											<span class="dot" aria-hidden="true"></span>
+											<span class="row-label">{stream.label}</span>
+											{#if preferenceRank(stream) === 0}
+												<span class="last-used">last used</span>
+											{/if}
+											{#if stream.quality}<span class="row-meta">{stream.quality}</span>{/if}
+											<span class="row-state">
+												{#if isActive && status === 'playing'}Playing
+												{:else if isActive && status === 'loading'}Loading
+												{:else if isDead}Failed{/if}
+											</span>
+										</button>
+									</li>
+								{/each}
+							</ul>
+						{:else}
+							<p class="panel-empty">
+								{searching ? 'Looking for servers…' : 'No servers found for this title.'}
+							</p>
+						{/if}
+						<footer class="panel-foot">
+							<button type="button" class="ghost" onclick={scrape}>Search again</button>
+						</footer>
+					</section>
+				{:else if openPanel === 'subtitles'}
+					<section id="panel-subtitles" class="panel" aria-label="Subtitles">
+						<header class="panel-head"><h2>Subtitles</h2></header>
+						<div class="panel-list" use:revealSelected>
+							<button
+								type="button"
+								class="row"
+								class:selected={!selectedSubtitle}
+								aria-pressed={!selectedSubtitle}
+								onclick={() => pickSubtitle('off')}
+							>
+								<span class="row-label">Off</span>
+							</button>
+							{#if streamSubtitles.length}
+								<p class="panel-group">From this server</p>
+								{#each streamSubtitles as option (option.key)}
+									<button
+										type="button"
+										class="row"
+										class:selected={selectedSubtitle?.key === option.key}
+										aria-pressed={selectedSubtitle?.key === option.key}
+										onclick={() => pickSubtitle(option.key)}
+									>
+										<span class="row-label">{option.label}</span>
+									</button>
+								{/each}
+							{/if}
+							{#each titleSubtitleGroups as [name, options] (name)}
+								<p class="panel-group">{name}</p>
+								{#each options as option (option.key)}
+									<button
+										type="button"
+										class="row"
+										class:selected={selectedSubtitle?.key === option.key}
+										aria-pressed={selectedSubtitle?.key === option.key}
+										onclick={() => pickSubtitle(option.key)}
+									>
+										<span class="row-label">{option.label}</span>
+									</button>
+								{/each}
+							{/each}
+						</div>
+						{#if selectedSubtitle?.kind === 'file'}
+							<footer class="panel-foot timing" role="group" aria-label="Subtitle timing">
+								<span>Timing</span>
+								<button
+									type="button"
+									class="step"
+									onclick={() => nudgeSubtitles(-0.5)}
+									aria-label="Subtitles earlier">−</button
+								>
+								<output>{subtitleOffset > 0 ? '+' : ''}{subtitleOffset.toFixed(1)}s</output>
+								<button
+									type="button"
+									class="step"
+									onclick={() => nudgeSubtitles(0.5)}
+									aria-label="Subtitles later">+</button
+								>
+							</footer>
+						{/if}
+					</section>
+				{:else if openPanel === 'episodes'}
+					<section id="panel-episodes" class="panel" aria-label="Episodes">
+						<header class="panel-head">
+							<h2>Episodes</h2>
+							<select aria-label="Season" value={season} onchange={handleSeasonChange}>
+								{#each seasons as item (item.number)}
+									<option value={item.number}>{item.name}</option>
+								{/each}
+							</select>
+						</header>
+						<ol class="panel-list" use:revealSelected>
+							{#each episodes as item (item.number)}
+								<li>
+									<button
+										type="button"
+										class="row"
+										class:selected={item.number === episode}
+										aria-pressed={item.number === episode}
+										onclick={() => pickEpisode(item.number)}
+									>
+										<span class="row-num">{item.number}</span>
+										<span class="row-label">{item.name}</span>
+									</button>
+								</li>
+							{/each}
+						</ol>
+					</section>
 				{/if}
-			</p>
-			{#each streams as stream (stream.url)}
-				<button
-					type="button"
-					in:scale={{ start: 0.6, duration: 260 }}
-					class:active={stream.url === activeUrl}
-					class:trying={stream.url === activeUrl && status === 'loading'}
-					class:dead={deadUrls.includes(stream.url)}
-					class:preferred={preferenceRank(stream) === 0}
-					title={preferenceRank(stream) === 0 ? 'Last used server' : undefined}
-					onclick={() => play(stream.url)}
-				>
-					<span class="dot" aria-hidden="true"></span>
-					{stream.label}
-					{#if stream.quality}<span class="quality">{stream.quality}</span>{/if}
-				</button>
-			{/each}
-		</nav>
-	{/if}
+			</div>
+		{/if}
+	</div>
 </main>
 
 <style>
@@ -992,14 +1263,14 @@
 		--red-soft: oklch(0.71 0.17 22 / 0.12);
 		--focus-ring: 0 0 0 3px oklch(0.8 0.15 78 / 0.38);
 		--ease: cubic-bezier(0.16, 1, 0.3, 1);
-		display: grid;
-		min-height: 100svh;
-		grid-template-rows: 1fr auto;
+		position: relative;
+		height: 100svh;
+		overflow: hidden;
 	}
 
 	.back {
 		position: fixed;
-		z-index: 10;
+		z-index: 30;
 		top: 1.5rem;
 		right: 1.5rem;
 		padding: 0.75rem 1rem;
@@ -1014,8 +1285,9 @@
 		cursor: pointer;
 		transition:
 			background-color 160ms ease,
+			opacity 320ms ease,
 			transform 220ms var(--ease);
-		animation: rise 0.6s var(--ease) 0.15s both;
+		animation: rise 0.6s var(--ease) 0.15s backwards;
 	}
 
 	.back:hover {
@@ -1025,9 +1297,7 @@
 
 	/* keyboard focus: soft glow, no hard outline */
 	.back:focus-visible,
-	.cta:focus-visible,
-	.sources button:focus-visible,
-	.episodes select:focus-visible {
+	.cta:focus-visible {
 		outline: none;
 		box-shadow: var(--focus-ring);
 	}
@@ -1036,7 +1306,6 @@
 		position: relative;
 		width: 100%;
 		height: 100%;
-		min-height: 60svh;
 		overflow: hidden;
 		background: oklch(0 0 0);
 	}
@@ -1468,128 +1737,121 @@
 		white-space: nowrap;
 	}
 
-	/* ---------- episode + server bars ---------- */
-
-	.episodes {
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: center;
-		gap: 0.6rem;
-		padding: 1rem 1rem 0;
-		background: var(--bg);
-	}
-
-	.episodes label {
-		display: flex;
-		align-items: center;
-		gap: 0.55rem;
-		min-width: 0;
-		color: var(--dim);
-		font-size: 0.62rem;
-		font-weight: 800;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-	}
-
-	.episodes select {
-		max-width: 16rem;
-		padding: 0.55rem 0.9rem;
-		border: 0;
-		border-radius: 999px;
-		background: var(--surface);
-		color: oklch(0.97 0.008 95 / 0.86);
-		font: inherit;
-		font-size: 0.74rem;
-		font-weight: 600;
-		text-overflow: ellipsis;
-		cursor: pointer;
-		transition: background-color 160ms ease;
-	}
-
-	.episodes select:hover {
-		background: var(--raised);
-	}
-
-	.sub-offset {
-		display: flex;
-		align-items: center;
-		gap: 0.2rem;
-		padding: 0.2rem;
-		border-radius: 999px;
-		background: var(--surface);
-		color: oklch(0.97 0.008 95 / 0.86);
-		font-size: 0.7rem;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.sub-offset span {
-		min-width: 3.2em;
-		text-align: center;
-	}
-
-	.sub-offset button {
-		width: 1.8rem;
-		height: 1.8rem;
-		border: 0;
-		border-radius: 50%;
-		background: transparent;
-		color: inherit;
-		font: inherit;
-		font-size: 0.9rem;
-		cursor: pointer;
-	}
-
-	.sub-offset button:hover {
-		background: var(--raised);
-	}
+	/* ---------- floating dock + panels ---------- */
 
 	video::cue {
 		background: rgb(0 0 0 / 0.6);
 		font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 	}
 
-	.sources {
+	.player.idle {
+		cursor: none;
+	}
+
+	.dock {
+		position: absolute;
+		z-index: 20;
+		top: max(1.25rem, env(safe-area-inset-top));
+		left: max(1.25rem, env(safe-area-inset-left));
+		display: grid;
+		justify-items: start;
+		gap: 0.55rem;
+		max-width: calc(100% - 2.5rem);
+		transition:
+			opacity 320ms ease,
+			transform 420ms var(--ease);
+	}
+
+	.dock.hidden,
+	.back.hidden {
+		opacity: 0;
+		pointer-events: none;
+		transform: translateY(-6px);
+	}
+
+	.dock-bar {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		justify-content: center;
-		gap: 0.4rem;
-		padding: 1rem 1rem max(1rem, env(safe-area-inset-bottom));
-		background: var(--bg);
+		gap: 0.3rem;
+		padding: 0.3rem;
+		border-radius: 999px;
+		background: oklch(0.16 0.005 80 / 0.72);
+		box-shadow:
+			0 0.75rem 2rem oklch(0 0 0 / 0.4),
+			inset 0 0 0 1px oklch(0.97 0.008 95 / 0.07);
+		backdrop-filter: blur(16px) saturate(1.2);
 	}
 
-	.sources-label {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.6rem;
-		width: 100%;
-		margin: 0 0 0.35rem;
-		color: var(--gold);
-		font-size: 0.62rem;
-		font-weight: 800;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
-	}
-
-	.live {
+	.dock-button {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.4rem;
-		padding: 0.2rem 0.55rem;
+		gap: 0.45rem;
+		max-width: 15rem;
+		padding: 0.5rem 0.8rem;
+		border: 0;
 		border-radius: 999px;
-		background: oklch(0.97 0.008 95 / 0.06);
-		color: var(--dim);
-		font-size: 0.6rem;
+		background: transparent;
+		color: var(--muted);
+		font: inherit;
+		font-size: 0.74rem;
 		font-weight: 650;
-		letter-spacing: 0.04em;
-		text-transform: none;
+		white-space: nowrap;
+		cursor: pointer;
+		transition:
+			background-color 160ms ease,
+			color 160ms ease;
+	}
+
+	.dock-button.icon-only {
+		padding: 0.5rem;
+	}
+
+	.dock-button svg {
+		flex: none;
+		width: 1rem;
+		height: 1rem;
+	}
+
+	.dock-button:hover,
+	.dock-button.open {
+		background: oklch(0.97 0.008 95 / 0.09);
+		color: var(--fg);
+	}
+
+	.dock-button.on svg {
+		color: var(--gold);
+	}
+
+	.dock-button:focus-visible,
+	.row:focus-visible,
+	.ghost:focus-visible,
+	.step:focus-visible,
+	.panel-head select:focus-visible {
+		outline: none;
+		box-shadow: var(--focus-ring);
+	}
+
+	.dock-label {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.dock-tag,
+	.dock-count {
+		padding: 0.1rem 0.4rem;
+		border-radius: 999px;
+		background: oklch(0.97 0.008 95 / 0.08);
+		color: var(--dim);
+		font-size: 0.62rem;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.live-dot {
 		position: relative;
-		width: 0.4rem;
-		height: 0.4rem;
+		flex: none;
+		width: 0.42rem;
+		height: 0.42rem;
 		border-radius: 50%;
 		background: var(--gold);
 	}
@@ -1603,56 +1865,175 @@
 		animation: ping 1.1s ease-out infinite;
 	}
 
-	.sources button {
+	.panel {
 		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.6rem 1rem;
-		border: 0;
-		border-radius: 999px;
-		background: var(--surface);
-		color: var(--muted);
-		font: inherit;
-		font-size: 0.74rem;
-		font-weight: 650;
-		cursor: pointer;
-		transition:
-			background-color 200ms ease,
-			color 200ms ease,
-			transform 220ms var(--ease);
+		flex-direction: column;
+		width: min(22rem, calc(100vw - 2.5rem));
+		max-height: min(32rem, calc(100svh - 7rem));
+		overflow: hidden;
+		border-radius: 1.1rem;
+		background: oklch(0.16 0.005 80 / 0.86);
+		box-shadow:
+			0 1.25rem 3rem oklch(0 0 0 / 0.5),
+			inset 0 0 0 1px oklch(0.97 0.008 95 / 0.07);
+		backdrop-filter: blur(20px) saturate(1.2);
+		transform-origin: top left;
+		animation: panel-in 220ms var(--ease);
 	}
 
-	.sources button:hover {
-		background: var(--raised);
+	.panel-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		padding: 0.9rem 1rem 0.6rem;
+	}
+
+	.panel-head h2 {
+		margin: 0;
+		color: var(--gold);
+		font-size: 0.62rem;
+		font-weight: 800;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+	}
+
+	.panel-head select {
+		max-width: 11rem;
+		padding: 0.4rem 0.7rem;
+		border: 0;
+		border-radius: 999px;
+		background: oklch(0.97 0.008 95 / 0.08);
+		color: var(--fg);
+		font: inherit;
+		font-size: 0.72rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.panel-note {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		color: var(--dim);
+		font-size: 0.66rem;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.panel-list {
+		display: grid;
+		gap: 0.1rem;
+		margin: 0;
+		padding: 0 0.4rem 0.5rem;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		list-style: none;
+		scrollbar-width: thin;
+	}
+
+	.panel-group {
+		margin: 0.7rem 0.6rem 0.25rem;
+		color: var(--dim);
+		font-size: 0.6rem;
+		font-weight: 800;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+	}
+
+	.panel-empty {
+		margin: 0;
+		padding: 0.5rem 1rem 1rem;
+		color: var(--muted);
+		font-size: 0.78rem;
+	}
+
+	.row {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		width: 100%;
+		padding: 0.6rem 0.65rem;
+		border: 0;
+		border-radius: 0.7rem;
+		background: transparent;
+		color: var(--muted);
+		font: inherit;
+		font-size: 0.78rem;
+		font-weight: 600;
+		text-align: left;
+		cursor: pointer;
+		transition:
+			background-color 140ms ease,
+			color 140ms ease;
+	}
+
+	.row:hover {
+		background: oklch(0.97 0.008 95 / 0.07);
 		color: var(--fg);
 	}
 
-	.sources button:active {
-		transform: scale(0.96);
+	.row.selected {
+		background: var(--gold-soft);
+		color: var(--fg);
 	}
 
-	.sources button.active {
-		background: var(--gold);
-		color: var(--on-gold);
-	}
-
-	.sources button.trying {
+	.row.trying {
 		animation: glow 1.2s ease-in-out infinite;
 	}
 
-	.sources button.dead {
-		opacity: 0.45;
+	.row.dead {
+		color: var(--dim);
+	}
+
+	.row.dead .row-label {
 		text-decoration: line-through;
 	}
 
-	.sources button.preferred:not(.active) {
-		box-shadow: inset 0 0 0 1px rgba(239, 179, 61, 0.45);
+	.row-label {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.row-meta,
+	.row-state,
+	.row-num {
+		color: var(--dim);
+		font-size: 0.66rem;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.row-num {
+		min-width: 1.6rem;
+	}
+
+	.row.selected .row-state,
+	.row.selected .row-num {
+		color: var(--gold);
+	}
+
+	.row .dot {
+		flex: none;
+		width: 0.45rem;
+		height: 0.45rem;
+		border-radius: 50%;
+		background: var(--green);
+	}
+
+	.row.dead .dot {
+		background: var(--red);
+	}
+
+	.row.trying .dot {
+		background: var(--gold);
 	}
 
 	.last-used {
 		padding: 0.05rem 0.4rem;
 		border-radius: 999px;
-		background: rgba(239, 179, 61, 0.16);
+		background: var(--gold-soft);
 		color: var(--gold);
 		font-size: 0.56rem;
 		font-weight: 750;
@@ -1660,24 +2041,88 @@
 		text-transform: uppercase;
 	}
 
-	.dot {
-		width: 0.42rem;
-		height: 0.42rem;
+	.panel-foot {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.35rem;
+		padding: 0.55rem 0.75rem 0.75rem;
+		border-top: 1px solid oklch(0.97 0.008 95 / 0.06);
+	}
+
+	.panel-foot.timing {
+		justify-content: space-between;
+		color: var(--dim);
+		font-size: 0.7rem;
+	}
+
+	.panel-foot.timing span {
+		margin-right: auto;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+
+	.panel-foot output {
+		min-width: 3.4em;
+		color: var(--fg);
+		font-variant-numeric: tabular-nums;
+		text-align: center;
+	}
+
+	.ghost,
+	.step {
+		border: 0;
+		background: oklch(0.97 0.008 95 / 0.08);
+		color: var(--fg);
+		font: inherit;
+		cursor: pointer;
+		transition: background-color 140ms ease;
+	}
+
+	.ghost {
+		padding: 0.45rem 0.9rem;
+		border-radius: 999px;
+		font-size: 0.72rem;
+		font-weight: 650;
+	}
+
+	.step {
+		width: 1.9rem;
+		height: 1.9rem;
 		border-radius: 50%;
-		background: var(--green);
+		font-size: 0.95rem;
 	}
 
-	.sources button.dead .dot {
-		background: var(--red);
+	.ghost:hover,
+	.step:hover {
+		background: oklch(0.97 0.008 95 / 0.14);
 	}
 
-	.sources button.active .dot {
-		background: var(--on-gold);
+	.back-text {
+		margin-left: 0.4em;
 	}
 
-	.quality {
-		opacity: 0.6;
-		font-size: 0.66rem;
+	/* phones: icons only, except the episode marker */
+	@media (max-width: 560px) {
+		.back {
+			top: max(1.25rem, env(safe-area-inset-top));
+			right: max(1.25rem, env(safe-area-inset-right));
+			padding: 0.7rem 0.85rem;
+		}
+
+		.back-text {
+			display: none;
+		}
+
+		.dock-button .dock-label:not(.always),
+		.dock-tag {
+			display: none;
+		}
+
+		.dock-button {
+			padding: 0.5rem 0.6rem;
+		}
 	}
 
 	/* ---------- keyframes ---------- */
@@ -1686,6 +2131,13 @@
 		from {
 			opacity: 0;
 			transform: translateY(12px);
+		}
+	}
+
+	@keyframes panel-in {
+		from {
+			opacity: 0;
+			transform: translateY(-6px) scale(0.97);
 		}
 	}
 
